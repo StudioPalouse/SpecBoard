@@ -1,0 +1,20 @@
+# Test/staging — https://test.specboard.ai (Fly app "specboard-test", org "specboard").
+# New code deploys here before production. Deploy from the repo root:
+#   fly deploy -c fly.test.toml
+app = "specboard-test"
+primary_region = "sjc"
+
+[build]
+  dockerfile = "infra/web.Dockerfile"
+
+[http_service]
+  internal_port = 3000
+  force_https = true
+  auto_stop_machines = "stop"
+  auto_start_machines = true
+  # Scale to zero when idle; cold start on first request is fine for test.
+  min_machines_running = 0
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "512mb"

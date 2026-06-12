@@ -1,0 +1,20 @@
+# Production — https://app.specboard.ai (Fly app "specboard", org "specboard").
+# Deploy from the repo root: fly deploy
+# Test environment config lives in fly.test.toml; deploy there first.
+app = "specboard"
+primary_region = "sjc"
+
+[build]
+  dockerfile = "infra/web.Dockerfile"
+
+[http_service]
+  internal_port = 3000
+  force_https = true
+  auto_stop_machines = "stop"
+  auto_start_machines = true
+  # Keep one machine warm in production; raise further once webhooks land.
+  min_machines_running = 1
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "512mb"

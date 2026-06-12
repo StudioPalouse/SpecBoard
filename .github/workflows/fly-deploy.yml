@@ -1,0 +1,40 @@
+# Cloud deploy pipeline:
+#   - every push to main deploys to test (https://test.specboard.ai)
+#   - production (https://app.specboard.ai) deploys via manual dispatch
+#     once a build has been verified on test
+name: Fly Deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Environment to deploy"
+        type: choice
+        options: [test, production]
+        required: true
+
+concurrency:
+  group: fly-deploy-${{ github.event.inputs.environment || 'test' }}
+
+jobs:
+  deploy-test:
+    if: github.event_name == 'push' || github.event.inputs.environment == 'test'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: superfly/flyctl-actions/setup-flyctl@master
+      - run: flyctl deploy -c fly.test.toml --remote-only
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN_TEST }}
+
+  deploy-production:
+    if: github.event.inputs.environment == 'production'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: superfly/flyctl-actions/setup-flyctl@master
+      - run: flyctl deploy --remote-only
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN_PROD }}

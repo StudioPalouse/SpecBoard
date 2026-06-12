@@ -233,6 +233,22 @@ self-host, but the SaaS must connect as a non-owner role. Add a
 
 ## Phase 2 — Fly.io setup (terminal / `flyctl`)
 
+> **Executed 2026-06-12**, with one amendment to the shape below: two
+> environments instead of one, both in the **specboard** Fly org, region
+> `sjc` (MPG is not offered in `sea`):
+>
+> | Env | Fly app | Domain | Postgres (MPG, basic plan) | Deploys |
+> | --- | --- | --- | --- | --- |
+> | test | `specboard-test` | test.specboard.ai | `specboard-db-test` | every push to `main` (GitHub Actions) |
+> | production | `specboard` | app.specboard.ai | `specboard-db` | manual `workflow_dispatch` after verifying on test |
+>
+> Configs: `fly.toml` (prod) and `fly.test.toml` at the repo root;
+> pipeline: `.github/workflows/fly-deploy.yml` (deploy tokens stored as the
+> `FLY_API_TOKEN_TEST` / `FLY_API_TOKEN_PROD` repo secrets). The RLS file
+> (`0001_rls_policies.sql`) is **not** applied to either MPG database — it
+> still uses Supabase's `auth.uid()` and is rewritten in Phase 1 (1.5),
+> which remains unexecuted.
+
 ```bash
 # 1. Install + sign in
 curl -L https://fly.io/install.sh | sh
