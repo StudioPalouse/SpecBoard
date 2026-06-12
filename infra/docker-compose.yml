@@ -29,6 +29,10 @@ services:
       # Set to "true" to reject sign-ups from consumer email providers
       # (gmail.com, outlook.com, ...). Off by default for self-host.
       SPECBOARD_BLOCK_PUBLIC_EMAIL_DOMAINS: "false"
+      # Optional outbound email (verification / password reset) via Postmark.
+      # Unset = emails are skipped with a logged warning.
+      # POSTMARK_SERVER_TOKEN: ""
+      # EMAIL_FROM: "SpecBoard <no-reply@example.com>"
     ports:
       - "3000:3000"
     depends_on:

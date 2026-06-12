@@ -1,8 +1,9 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useTransition } from "react";
 
-import { updateFeatureStatus } from "@/app/actions";
+import { patchFeature } from "@/lib/api-client";
 import { Select } from "@/components/ui/select";
 import { statusLabel, statusOptions } from "@/lib/feature-helpers";
 
@@ -16,6 +17,7 @@ export function StatusSelect({
   status: string;
   className?: string;
 }) {
+  const router = useRouter();
   const [pending, startTransition] = useTransition();
   return (
     <Select
@@ -24,7 +26,10 @@ export function StatusSelect({
       className={className}
       onChange={(e) => {
         const next = e.target.value;
-        startTransition(() => updateFeatureStatus(specId, next));
+        startTransition(async () => {
+          await patchFeature(specId, { status: next });
+          router.refresh();
+        });
       }}
     >
       {statusOptions(status).map((s) => (

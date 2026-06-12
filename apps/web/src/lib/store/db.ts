@@ -1,7 +1,5 @@
-import { eq } from "drizzle-orm";
-
 import { extractSections } from "@specboard/core";
-import { createDb, features, specIndex, type Database } from "@specboard/db";
+import { createDb, eq, features, specIndex, type Database } from "@specboard/db";
 
 import type {
   FeatureDetail,

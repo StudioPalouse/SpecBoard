@@ -5,7 +5,7 @@ import { APIError, createAuthMiddleware } from "better-auth/api";
 import { isBlockedEmailDomain } from "@specboard/core";
 import { createDb, schema } from "@specboard/db";
 
-let auth: ReturnType<typeof betterAuth> | null | undefined;
+import { sendEmail } from "@/lib/email";
 
 /**
  * Reject sign-ups from consumer email providers (gmail.com, outlook.com, …)
@@ -17,6 +17,62 @@ function blockPublicEmailDomains(): boolean {
   return value === "1" || value === "true" || value === "yes";
 }
 
+function createAuth(url: string) {
+  return betterAuth({
+    database: drizzleAdapter(createDb(url), {
+      provider: "pg",
+      schema: {
+        user: schema.users,
+        session: schema.sessions,
+        account: schema.accounts,
+        verification: schema.verifications,
+      },
+    }),
+    emailAndPassword: {
+      enabled: true,
+      sendResetPassword: async ({ user, url }) => {
+        await sendEmail({
+          to: user.email,
+          subject: "Reset your SpecBoard password",
+          textBody: `Hi ${user.name},\n\nReset your SpecBoard password here:\n${url}\n\nIf you didn't request this, you can ignore this email.`,
+        });
+      },
+    },
+    emailVerification: {
+      // Delivered via Postmark when POSTMARK_SERVER_TOKEN is set; sign-in is
+      // not blocked on verification yet (flip requireEmailVerification once
+      // the sending domain is verified and a sign-up UI exists).
+      sendOnSignUp: true,
+      sendVerificationEmail: async ({ user, url }) => {
+        await sendEmail({
+          to: user.email,
+          subject: "Verify your SpecBoard email",
+          textBody: `Hi ${user.name},\n\nConfirm your email address to finish setting up SpecBoard:\n${url}`,
+        });
+      },
+    },
+    hooks: {
+      before: createAuthMiddleware(async (ctx) => {
+        if (ctx.path !== "/sign-up/email" || !blockPublicEmailDomains()) return;
+        const email = typeof ctx.body?.email === "string" ? ctx.body.email : "";
+        if (isBlockedEmailDomain(email)) {
+          throw new APIError("BAD_REQUEST", {
+            message:
+              "Please sign up with your work email address. Personal email providers are not supported on the hosted service.",
+          });
+        }
+      }),
+    },
+    advanced: {
+      // Postgres mints UUID ids (see schema) instead of Better Auth's
+      // default text ids.
+      database: { generateId: false },
+    },
+  });
+}
+
+let auth: ReturnType<typeof createAuth> | null | undefined;
+
 /**
  * Better Auth server instance, resolved once per process. Mirrors the
  * `getStore()` pattern: gated on `DATABASE_URL`, `null` in local file mode.
@@ -24,37 +80,7 @@ function blockPublicEmailDomains(): boolean {
 export function getAuth() {
   if (auth === undefined) {
     const url = process.env.DATABASE_URL;
-    auth = url
-      ? betterAuth({
-          database: drizzleAdapter(createDb(url), {
-            provider: "pg",
-            schema: {
-              user: schema.users,
-              session: schema.sessions,
-              account: schema.accounts,
-              verification: schema.verifications,
-            },
-          }),
-          emailAndPassword: { enabled: true },
-          hooks: {
-            before: createAuthMiddleware(async (ctx) => {
-              if (ctx.path !== "/sign-up/email" || !blockPublicEmailDomains()) return;
-              const email = typeof ctx.body?.email === "string" ? ctx.body.email : "";
-              if (isBlockedEmailDomain(email)) {
-                throw new APIError("BAD_REQUEST", {
-                  message:
-                    "Please sign up with your work email address. Personal email providers are not supported on the hosted service.",
-                });
-              }
-            }),
-          },
-          advanced: {
-            // Postgres mints UUID ids (see schema) instead of Better Auth's
-            // default text ids.
-            database: { generateId: false },
-          },
-        })
-      : null;
+    auth = url ? createAuth(url) : null;
   }
   return auth;
 }

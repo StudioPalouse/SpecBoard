@@ -2,14 +2,11 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import ReactMarkdown from "react-markdown";
 
-import { updateFeatureMeta } from "@/app/actions";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Select } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
+import { FeatureMetaForm } from "@/components/feature-meta-form";
 import { StatusDot } from "@/components/status-dot";
-import { statusLabel, statusOptions } from "@/lib/feature-helpers";
+import { statusLabel } from "@/lib/feature-helpers";
 import { getStore } from "@/lib/store";
 
 export const dynamic = "force-dynamic";
@@ -56,60 +53,7 @@ export default async function FeaturePage({
           {statusLabel(feature.status)}
         </div>
         <Separator />
-        <form
-          action={updateFeatureMeta.bind(null, feature.specId)}
-          className="space-y-3"
-        >
-          <label className="block space-y-1.5">
-            <span className="text-xs font-medium text-muted-foreground">
-              Status
-            </span>
-            <Select name="status" defaultValue={feature.status} className="h-8">
-              {statusOptions(feature.status).map((s) => (
-                <option key={s} value={s}>
-                  {statusLabel(s)}
-                </option>
-              ))}
-            </Select>
-          </label>
-          <label className="block space-y-1.5">
-            <span className="text-xs font-medium text-muted-foreground">
-              Priority (0 = highest)
-            </span>
-            <Input
-              name="priority"
-              type="number"
-              min={0}
-              max={4}
-              defaultValue={feature.priority ?? ""}
-              className="h-8"
-            />
-          </label>
-          <label className="block space-y-1.5">
-            <span className="text-xs font-medium text-muted-foreground">
-              Roadmap quarter
-            </span>
-            <Input
-              name="roadmapQuarter"
-              placeholder="2026-Q3"
-              defaultValue={feature.roadmapQuarter ?? ""}
-              className="h-8"
-            />
-          </label>
-          <label className="block space-y-1.5">
-            <span className="text-xs font-medium text-muted-foreground">
-              Tags (comma-separated)
-            </span>
-            <Input
-              name="tags"
-              defaultValue={feature.tags.join(", ")}
-              className="h-8"
-            />
-          </label>
-          <Button type="submit" size="sm" variant="outline">
-            Save metadata
-          </Button>
-        </form>
+        <FeatureMetaForm feature={feature} />
         <Separator />
         <div className="space-y-2">
           <div className="flex flex-wrap gap-1">
