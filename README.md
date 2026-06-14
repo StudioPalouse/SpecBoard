@@ -12,9 +12,11 @@ Open-core: self-host the core for free, or use the hosted SaaS.
 - **Design:** [`ARCHITECTURE.md`](./ARCHITECTURE.md)
 - **Build plan:** [`docs/PLAN.md`](./docs/PLAN.md)
 
-> Status: **early build**. The web UI (Backlog · Board · Roadmap · Feature
-> detail), spec parsing, status workflow, DB schema/seed, and MCP tools are
-> working; GitHub sync and auth are still stubbed.
+> Status: **active build**. Working: the web UI (Backlog · Board · Roadmap ·
+> Feature detail), spec parsing, status workflow, DB schema/seed, MCP tools,
+> auth (sign-up/in, email verification, password reset, account/settings), and
+> GitHub sync (one-click App setup, repo connect/picker, push reconcile).
+> Still stubbed: editing spec content from the UI.
 
 ## Layout
 

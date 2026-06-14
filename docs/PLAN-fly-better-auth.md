@@ -228,11 +228,21 @@ self-host, but the SaaS must connect as a non-owner role. Add a
 | Var | Purpose |
 | --- | --- |
 | `DATABASE_URL` | Postgres; absent = local file mode, auth disabled |
-| `BETTER_AUTH_SECRET` | session/signing secret (`openssl rand -hex 32`) |
-| `BETTER_AUTH_URL` | canonical app URL (needed behind Fly's proxy) |
-| `GITHUB_APP_ID` | GitHub App id; absent = spec sync disabled |
+| `BETTER_AUTH_SECRET` | session/signing secret (`openssl rand -hex 32`); also the key that encrypts stored GitHub App credentials at rest |
+| `BETTER_AUTH_URL` | canonical app URL (needed behind Fly's proxy); also the public origin used for GitHub manifest callback URLs |
+| `APP_URL` | optional override for the public origin (falls back to `BETTER_AUTH_URL`, then forwarded headers) |
+
+GitHub App credentials are normally created in-app (the manifest flow) and
+stored **encrypted in the `github_app` table** — no env vars required. The
+following are an optional fallback for air-gapped/scripted setups (stored creds
+take precedence when both exist):
+
+| Var | Purpose |
+| --- | --- |
+| `GITHUB_APP_ID` | GitHub App id |
 | `GITHUB_APP_PRIVATE_KEY` | App PEM (literal `\n` escapes are unfolded at load) |
 | `GITHUB_WEBHOOK_SECRET` | HMAC secret for `X-Hub-Signature-256` verification |
+| `NEXT_PUBLIC_GITHUB_APP_SLUG` | App slug for the install URL (read server-side) |
 
 `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_ANON_KEY` disappear.
 
@@ -419,12 +429,18 @@ Rough priority order; the first three unblock real multi-user usage.
    import). Each sync reads `.specboard/config.yml` from the repo (via the App)
    and stores the parsed `RepoConfig` on the `repositories` row, so spec globs
    and custom-field definitions track git. Production already runs
-   `min_machines_running = 1` so deliveries won't hit cold starts. **Owner
-   action to go live:** follow `docs/RUNBOOK-github-sync.md` — create the GitHub
-   App, set the three `GITHUB_*` secrets, install on the repo, and register it.
-   _Still open (follow-up):_ a management UI for connecting repos (registration
-   is curl-only today), and handling spec **deletion** (a removed file currently
-   leaves its feature row to avoid nuking user comments/metadata).
+   `min_machines_running = 1` so deliveries won't hit cold starts.
+   **Done 2026-06-14 — in-app one-click setup:** admins create the deployment's
+   GitHub App via the **manifest flow** (`/api/v1/github/app/create` →
+   `/callback`), credentials stored encrypted in `github_app` (AES-256-GCM off
+   `BETTER_AUTH_SECRET`); the env `GITHUB_*` vars are now an optional fallback.
+   The **Repositories** page handles App setup, install (`/api/v1/github/setup`
+   captures the installation), a repo **picker**
+   (`/api/v1/github/installations/repositories`), and connect/re-sync — the old
+   curl registration is now an advanced fallback. See `docs/RUNBOOK-github-sync.md`.
+   _Still open (follow-up):_ handling spec **deletion** (a removed file currently
+   leaves its feature row to avoid nuking user comments/metadata), and editing
+   spec content from the UI (PR write-back).
 6. ~~**First-run onboarding choice.**~~ **Done 2026-06-13.** `/setup` now asks
    the first user to either seed a starter board (sample data baked into the app
    — `lib/sample-data.ts`, seeded into a synthetic "sample" repo) or start empty;

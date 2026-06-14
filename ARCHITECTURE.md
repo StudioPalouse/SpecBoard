@@ -58,20 +58,25 @@ Next.js web app  ── apps/web           MCP server ── apps/mcp
   parser (`parseSpec`), status state machine (`canTransition`), `.specboard/config.yml`
   schema (`parseRepoConfig`). Unit-tested.
 - **`packages/db`** — Drizzle schema (`workspaces`, `members`, `repositories`,
-  `features`, `spec_index`, `comments`, `activity_log`, plus the Better Auth
+  `features`, `spec_index`, `comments`, `activity_log`, the deployment-global
+  `github_app` credential row, plus the Better Auth
   `users`/`sessions`/`accounts`/`verifications` tables) + Postgres client. RLS
   policies in `infra/migrations`.
 - **`packages/git`** — GitHub App client + reconciler (`reconcileSpecs`), webhook
-  verification/affected-spec resolution. _(GitHub calls stubbed in scaffold.)_
+  verification/affected-spec resolution, installation-repo listing (via `octokit`).
 - **`packages/ui`** — shared design tokens / components.
 - **`apps/web`** — Next.js App Router UI; in-app auth via Better Auth
-  (`/api/auth/*`); routes for Backlog, Board, Roadmap, Feature detail.
+  (`/api/auth/*`: sign-up/in, email verification, password reset, account
+  settings); routes for Backlog, Board, Roadmap, Feature detail, and
+  Repositories (GitHub App setup + repo connect).
 - **`apps/mcp`** — MCP server exposing prioritized, status-aware specs to agents.
 
 ## Key flows
 
-1. **Connect repo** — install GitHub App → scan `specs/**` per `.specboard/config.yml`
-   → create `features` + `spec_index`, injecting missing `id`s.
+1. **Connect repo** — an admin creates the deployment's GitHub App in one click
+   (GitHub App *manifest* flow; credentials stored encrypted in `github_app`),
+   installs it and picks repos, then connects one → scan `specs/**` per
+   `.specboard/config.yml` → create `features` + `spec_index`, injecting missing `id`s.
 2. **Reconcile on push** — webhook → re-parse changed specs → update `spec_index`;
    `blob_sha` detects drift/conflicts.
 3. **Edit spec in UI** — save → `packages/git` writes a commit or opens a PR
@@ -122,10 +127,13 @@ deployment shape.
 
 ## Status
 
-**Early build.** Working: web UI (Backlog · Board · Roadmap · Feature detail,
+**Active build.** Working: web UI (Backlog · Board · Roadmap · Feature detail,
 base shadcn styling), spec parser + status workflow (`packages/core`), Drizzle
 schema/migrations/seed (`packages/db`), DB-backed MCP tools (`apps/mcp`), local
-file mode, auth endpoints (Better Auth: email/password sign-up with optional
-consumer-domain blocking). Still stubbed: GitHub App sync (`packages/git`),
-sign-in/sign-up UI and session-gated writes, spec editing from the UI. See
-`docs/PLAN.md` for the build plan.
+file mode; full auth (Better Auth: email/password sign-up/in, email
+verification, password reset, account/company settings, optional consumer-domain
+blocking, session-gated writes); GitHub App sync (`packages/git`) — one-click
+in-app App setup (manifest flow), repo install + connect picker, push reconcile
+into `features`/`spec_index`, stable-id injection. Still stubbed: editing spec
+content from the UI (PR write-back), spec **deletion** handling. See
+`docs/PLAN.md` for the build plan and `docs/RUNBOOK-github-sync.md` for setup.

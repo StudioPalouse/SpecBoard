@@ -121,8 +121,9 @@ specboard/
 - **RLS** scopes every row by `workspace_id`; SaaS = many workspaces, self-host = one.
 
 ### Key flows
-1. **Import/connect repo:** install GitHub App → scan `specs/**` per `.specboard/config.yml` →
-   create `features` + `spec_index`, inject missing `id` frontmatter.
+1. **Import/connect repo:** one-click create the GitHub App (manifest flow, creds
+   stored encrypted) → install + pick repos → connect → scan `specs/**` per
+   `.specboard/config.yml` → create `features` + `spec_index`, inject missing `id`.
 2. **Webhook reconcile:** push to repo → re-parse changed specs → update `spec_index`; detect
    conflicts via `blob_sha`.
 3. **Edit spec in UI:** save → `git` package writes a commit (configurable: direct to branch or
