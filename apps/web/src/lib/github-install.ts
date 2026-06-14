@@ -33,8 +33,10 @@ export function newSetupNonce(): string {
  * env override for unusual setups. Used to build absolute GitHub callback URLs.
  */
 export function appOriginFromRequest(req: Request): string {
-  const override = process.env.APP_URL?.trim();
-  if (override) return override.replace(/\/+$/, "");
+  // Prefer an explicitly configured public URL — authoritative and immune to
+  // proxy header quirks. BETTER_AUTH_URL is already set wherever auth runs.
+  const configured = (process.env.APP_URL ?? process.env.BETTER_AUTH_URL)?.trim();
+  if (configured) return configured.replace(/\/+$/, "");
   const proto = req.headers.get("x-forwarded-proto") ?? "https";
   const host = req.headers.get("x-forwarded-host") ?? req.headers.get("host") ?? "";
   return `${proto}://${host}`;
