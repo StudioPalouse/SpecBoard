@@ -4,11 +4,17 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { and, eq, inArray, or } from "drizzle-orm";
 import { z } from "zod";
 
-import { canTransition, rollUpEstimates } from "@specboard/core";
+import {
+  canTransition,
+  resolveWorkflow,
+  rollUpEstimates,
+  safeParseRepoConfig,
+} from "@specboard/core";
 import {
   createDb,
   featureLinks,
   features,
+  repositories,
   workspaces,
   type Database,
 } from "@specboard/db";
@@ -281,7 +287,13 @@ server.tool(
       });
       if (!row)
         return errorResult(new Error(`No feature with spec id ${specId}`));
-      if (!canTransition(row.status, status)) {
+      // Validate against the workspace's (possibly custom) status workflow.
+      const [repo] = await db()
+        .select({ config: repositories.config })
+        .from(repositories)
+        .where(eq(repositories.workspaceId, row.workspaceId));
+      const workflow = resolveWorkflow(safeParseRepoConfig(repo?.config));
+      if (!canTransition(row.status, status, workflow)) {
         return errorResult(
           new Error(`Illegal transition: ${row.status} -> ${status}`),
         );

@@ -1,5 +1,6 @@
 import { canTransition } from "@specboard/core";
 
+import { resolveWorkflowFor } from "@/lib/repo-config";
 import {
   getStore,
   type CustomFieldValue,
@@ -136,10 +137,13 @@ export async function patchFeature(
   const feature = await store.getFeature(specId, scope);
   if (!feature) throw new FeatureNotFoundError(specId);
 
-  if (patch.status !== undefined && !canTransition(feature.status, patch.status)) {
-    throw new InvalidPatchError(
-      `Illegal transition: ${feature.status} -> ${patch.status}`,
-    );
+  if (patch.status !== undefined) {
+    const workflow = await resolveWorkflowFor(scope ?? null);
+    if (!canTransition(feature.status, patch.status, workflow)) {
+      throw new InvalidPatchError(
+        `Illegal transition: ${feature.status} -> ${patch.status}`,
+      );
+    }
   }
 
   if (patch.parentSpecId) {

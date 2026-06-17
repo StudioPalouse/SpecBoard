@@ -12,6 +12,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import type { StatusWorkflow } from "@specboard/core";
+
 import { StatusDot } from "@/components/status-dot";
 import { StatusSelect } from "@/components/status-select";
 import { priorityLabel } from "@/lib/feature-helpers";
@@ -33,9 +35,11 @@ const STORAGE_KEY = "specboard:backlog:collapsed";
 export function BacklogTable({
   rows,
   canEdit,
+  workflow,
 }: {
   rows: BacklogRow[];
   canEdit: boolean;
+  workflow?: StatusWorkflow;
 }) {
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
 
@@ -142,6 +146,7 @@ export function BacklogTable({
                     status={f.status}
                     className="h-8 w-36"
                     canEdit={canEdit}
+                    workflow={workflow}
                   />
                 </div>
               </TableCell>

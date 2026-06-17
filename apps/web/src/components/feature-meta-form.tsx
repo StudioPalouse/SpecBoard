@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
-import type { EstimateConfig, RepoConfig } from "@specboard/core";
+import type { EstimateConfig, RepoConfig, StatusWorkflow } from "@specboard/core";
 
 import { AuthRequiredError, patchFeature } from "@/lib/api-client";
 import { Button } from "@/components/ui/button";
@@ -22,6 +22,7 @@ export function FeatureMetaForm({
   customFields = [],
   candidates = [],
   estimate,
+  workflow,
   canEdit = true,
 }: {
   feature: FeatureDetail;
@@ -31,6 +32,8 @@ export function FeatureMetaForm({
   candidates?: { specId: string; title: string }[];
   /** Effort scale + label for the estimate select. */
   estimate: EstimateConfig;
+  /** Workspace status workflow (custom statuses/transitions); default if omitted. */
+  workflow?: StatusWorkflow;
   canEdit?: boolean;
 }) {
   const router = useRouter();
@@ -93,7 +96,7 @@ export function FeatureMetaForm({
           Status
         </span>
         <Select name="status" defaultValue={feature.status} className="h-8">
-          {statusOptions(feature.status).map((s) => (
+          {statusOptions(feature.status, workflow).map((s) => (
             <option key={s} value={s}>
               {statusLabel(s)}
             </option>

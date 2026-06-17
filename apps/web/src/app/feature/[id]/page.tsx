@@ -7,7 +7,7 @@ import { Separator } from "@/components/ui/separator";
 import { FeatureMetaForm } from "@/components/feature-meta-form";
 import { FeatureRelations } from "@/components/feature-relations";
 import { StatusDot } from "@/components/status-dot";
-import { resolveEstimateConfig } from "@specboard/core";
+import { resolveEstimateConfig, resolveWorkflow } from "@specboard/core";
 
 import { getDb } from "@/lib/db";
 import { statusLabel } from "@/lib/feature-helpers";
@@ -40,6 +40,7 @@ export default async function FeaturePage({
   const repoConfig = await resolveRepoConfig(access);
   const customFields = repoConfig?.fields ?? [];
   const estimateConfig = resolveEstimateConfig(repoConfig);
+  const workflow = resolveWorkflow(repoConfig);
 
   // Other features the relation editor can point at (excluding this one).
   const allFeatures = await store.listFeatures(access ?? undefined);
@@ -88,6 +89,7 @@ export default async function FeaturePage({
           customFields={customFields}
           candidates={parentCandidates}
           estimate={estimateConfig}
+          workflow={workflow}
           canEdit={!access || canWrite(access.role)}
         />
         <Separator />

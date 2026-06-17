@@ -1,7 +1,5 @@
 import Link from "next/link";
 
-import { DEFAULT_STATUSES } from "@specboard/core";
-
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { EmptyState } from "@/components/empty-state";
@@ -12,18 +10,19 @@ import {
   sortFeatures,
   statusLabel,
 } from "@/lib/feature-helpers";
+import { resolveWorkflowFor } from "@/lib/repo-config";
 import { getStore } from "@/lib/store";
 import { canWrite } from "@/lib/workspace";
 import { canConnectRepos, requireWorkspaceAccess } from "@/lib/workspace-access";
 
 export const dynamic = "force-dynamic";
 
-const COLUMNS = DEFAULT_STATUSES.filter((s) => s !== "archived");
-
 /** Kanban board: features grouped by status, moved via legal transitions. */
 export default async function BoardPage() {
   const access = await requireWorkspaceAccess();
   const canEdit = !access || canWrite(access.role);
+  const workflow = await resolveWorkflowFor(access);
+  const columns = workflow.statuses.filter((s) => s !== "archived");
   const store = await getStore();
   const features = sortFeatures(await store.listFeatures(access ?? undefined));
 
@@ -34,7 +33,7 @@ export default async function BoardPage() {
         <EmptyState canConnect={canConnectRepos(access)} />
       ) : (
       <div className="flex gap-3 overflow-x-auto pb-4">
-        {COLUMNS.map((status) => {
+        {columns.map((status) => {
           const cards = features.filter((f) => f.status === status);
           return (
             <div
@@ -127,6 +126,7 @@ export default async function BoardPage() {
                         status={f.status}
                         className="h-7 text-xs"
                         canEdit={canEdit}
+                        workflow={workflow}
                       />
                     </CardContent>
                   </Card>

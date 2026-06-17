@@ -1,5 +1,3 @@
-import { DEFAULT_STATUSES } from "@specboard/core";
-
 import { EmptyState } from "@/components/empty-state";
 import { getDb } from "@/lib/db";
 import {
@@ -8,6 +6,7 @@ import {
   parseFeatureFilters,
 } from "@/lib/feature-filters";
 import { sortFeatures } from "@/lib/feature-helpers";
+import { resolveWorkflowFor } from "@/lib/repo-config";
 import { getStore } from "@/lib/store";
 import { canWrite, listWorkspaceMembers } from "@/lib/workspace";
 import { canConnectRepos, requireWorkspaceAccess } from "@/lib/workspace-access";
@@ -16,8 +15,6 @@ import { BacklogTable, type BacklogRow } from "./backlog-table";
 import { SavedViews } from "./saved-views";
 
 export const dynamic = "force-dynamic";
-
-const STATUS_OPTIONS = DEFAULT_STATUSES.filter((s) => s !== "archived");
 
 /**
  * Backlog: prioritized list of features. Status edits here update metadata
@@ -31,6 +28,7 @@ export default async function BacklogPage({
 }) {
   const access = await requireWorkspaceAccess();
   const canEdit = !access || canWrite(access.role);
+  const workflow = await resolveWorkflowFor(access);
   const filters = parseFeatureFilters(await searchParams);
   const store = await getStore();
   const features = sortFeatures(await store.listFeatures(access ?? undefined)).filter(
@@ -44,7 +42,7 @@ export default async function BacklogPage({
   const savedViews = await store.listSavedViews(access ?? undefined);
 
   const options: FilterOptions = {
-    statuses: STATUS_OPTIONS,
+    statuses: workflow.statuses.filter((s) => s !== "archived"),
     assignees: members.map((m) => ({ userId: m.userId, name: m.name })),
     tags: [...new Set(features.flatMap((f) => f.tags))].sort(),
     epics: features
@@ -87,7 +85,7 @@ export default async function BacklogPage({
               No features match these filters.
             </p>
           ) : (
-            <BacklogTable rows={rows} canEdit={canEdit} />
+            <BacklogTable rows={rows} canEdit={canEdit} workflow={workflow} />
           )}
         </>
       )}
