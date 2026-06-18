@@ -41,7 +41,7 @@ export async function GET(req: Request) {
 
   const membership = await getMembership(db, user.id);
   if (!membership || membership.role !== "admin" || !installationId) {
-    return redirectTo("/repositories?error=install");
+    return redirectTo("/settings/repositories?error=install");
   }
 
   // Remember the installation for this admin so the picker can list its repos
@@ -55,5 +55,5 @@ export async function GET(req: Request) {
     maxAge: INSTALL_COOKIE_MAX_AGE,
   });
 
-  return redirectTo("/repositories?connected=1");
+  return redirectTo("/settings/repositories?connected=1");
 }

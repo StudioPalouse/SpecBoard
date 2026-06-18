@@ -26,7 +26,7 @@ export function EmptyState({ canConnect = false }: { canConnect?: boolean }) {
             : "Once an admin connects the repository where your specs live, features will appear here automatically."}
         </p>
         {canConnect ? (
-          <Link href="/repositories" className={buttonVariants({ size: "sm" })}>
+          <Link href="/settings/repositories" className={buttonVariants({ size: "sm" })}>
             Connect a repository
           </Link>
         ) : null}

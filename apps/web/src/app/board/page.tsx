@@ -3,6 +3,7 @@ import { resolveEstimateConfig, resolveWorkflow } from "@specboard/core";
 import { BoardClient } from "@/app/board/board-client";
 import { CardFieldsMenu } from "@/components/card-fields-menu";
 import { EmptyState } from "@/components/empty-state";
+import { WorkViewTabs } from "@/components/work-view-tabs";
 import { getBoardPreferences } from "@/lib/board-preferences-service";
 import { cardFieldCatalog, resolveCardFields } from "@/lib/card-fields";
 import { getDb } from "@/lib/db";
@@ -42,7 +43,7 @@ export default async function BoardPage() {
   return (
     <section className="space-y-4">
       <div className="flex items-center justify-between">
-        <h1 className="text-lg font-semibold tracking-tight">Board</h1>
+        <WorkViewTabs />
         {features.length > 0 && canEdit ? (
           <CardFieldsMenu
             catalog={catalog}

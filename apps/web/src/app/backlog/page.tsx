@@ -1,4 +1,5 @@
 import { EmptyState } from "@/components/empty-state";
+import { WorkViewTabs } from "@/components/work-view-tabs";
 import { getDb } from "@/lib/db";
 import {
   applyFeatureFilters,
@@ -63,8 +64,8 @@ export default async function BacklogPage({
 
   return (
     <section className="space-y-4">
-      <div>
-        <h1 className="text-lg font-semibold tracking-tight">Backlog</h1>
+      <div className="space-y-2">
+        <WorkViewTabs />
         <p className="text-sm text-muted-foreground">
           Prioritized features. Metadata edits land in the database; spec
           content stays in git.

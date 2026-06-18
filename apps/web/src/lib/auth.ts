@@ -51,6 +51,12 @@ function createAuth(url: string) {
       },
     },
     user: {
+      // Extra profile columns beyond Better Auth's defaults. `timezone` is the
+      // user's IANA zone, edited on Settings → Profile (kept in sync with the
+      // client's inferAdditionalFields in auth-client.ts and the users schema).
+      additionalFields: {
+        timezone: { type: "string", required: false, input: true },
+      },
       // Let users change their email from the account page. Because their
       // current address is verified, Better Auth sends a confirmation link to
       // the *existing* inbox; the change only takes effect once that's clicked.

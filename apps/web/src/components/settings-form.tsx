@@ -1,10 +1,11 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
+import { useMemo, useState, useTransition } from "react";
 
 import { updateWorkspace } from "@/lib/api-client";
 import { changeEmail, updateUser } from "@/lib/auth-client";
+import { ThemeToggle } from "@/components/theme-toggle";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -17,30 +18,6 @@ import { Input } from "@/components/ui/input";
 
 type Status = { kind: "ok" | "error"; message: string } | null;
 
-interface SettingsFormProps {
-  user: { name: string; email: string; image: string | null };
-  company: { name: string };
-  /** Whether the viewer may edit company details (admin). */
-  canEditCompany: boolean;
-}
-
-/** Account settings: profile, email, and (for admins) company details. */
-export function SettingsForm({ user, company, canEditCompany }: SettingsFormProps) {
-  return (
-    <div className="mx-auto w-full max-w-xl space-y-6">
-      <div>
-        <h1 className="text-lg font-semibold tracking-tight">Settings</h1>
-        <p className="text-sm text-muted-foreground">
-          Manage your profile, sign-in email, and organization.
-        </p>
-      </div>
-      <ProfileCard name={user.name} image={user.image} />
-      <EmailCard email={user.email} />
-      <CompanyCard name={company.name} canEdit={canEditCompany} />
-    </div>
-  );
-}
-
 function StatusLine({ status }: { status: Status }) {
   if (!status) return null;
   return (
@@ -52,16 +29,46 @@ function StatusLine({ status }: { status: Status }) {
   );
 }
 
-function ProfileCard({ name, image }: { name: string; image: string | null }) {
+/** The set of IANA time zones for the picker, with a sensible fallback. */
+function useTimeZones(): string[] {
+  return useMemo(() => {
+    try {
+      // Available in modern runtimes; guard for older ones.
+      const supported = (
+        Intl as unknown as { supportedValuesOf?: (k: string) => string[] }
+      ).supportedValuesOf;
+      if (supported) return supported("timeZone");
+    } catch {
+      /* fall through */
+    }
+    return ["UTC"];
+  }, []);
+}
+
+export function ProfileCard({
+  name,
+  image,
+  timezone,
+}: {
+  name: string;
+  image: string | null;
+  timezone: string | null;
+}) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [status, setStatus] = useState<Status>(null);
+  const zones = useTimeZones();
+  const browserZone =
+    typeof Intl !== "undefined"
+      ? Intl.DateTimeFormat().resolvedOptions().timeZone
+      : "UTC";
 
   function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const data = new FormData(e.currentTarget);
     const nextName = String(data.get("name") ?? "").trim();
     const nextImage = String(data.get("image") ?? "").trim();
+    const nextTimezone = String(data.get("timezone") ?? "").trim();
     if (!nextName) {
       setStatus({ kind: "error", message: "Name is required." });
       return;
@@ -69,7 +76,11 @@ function ProfileCard({ name, image }: { name: string; image: string | null }) {
     startTransition(async () => {
       setStatus(null);
       // Send the empty string (not undefined) so clearing the field removes the picture.
-      const { error } = await updateUser({ name: nextName, image: nextImage });
+      const { error } = await updateUser({
+        name: nextName,
+        image: nextImage,
+        timezone: nextTimezone,
+      });
       if (error) {
         setStatus({ kind: "error", message: error.message ?? "Couldn't save your profile." });
         return;
@@ -83,7 +94,7 @@ function ProfileCard({ name, image }: { name: string; image: string | null }) {
     <Card>
       <CardHeader>
         <CardTitle>Profile</CardTitle>
-        <CardDescription>Your name and picture across SpecBoard.</CardDescription>
+        <CardDescription>Your name, picture, and time zone across SpecBoard.</CardDescription>
       </CardHeader>
       <CardContent>
         <form onSubmit={onSubmit} className="space-y-4">
@@ -105,11 +116,41 @@ function ProfileCard({ name, image }: { name: string; image: string | null }) {
             <span className="text-xs font-medium text-muted-foreground">Name</span>
             <Input name="name" defaultValue={name} autoComplete="name" required />
           </label>
+          <label className="block space-y-1.5">
+            <span className="text-xs font-medium text-muted-foreground">Time zone</span>
+            <select
+              name="timezone"
+              defaultValue={timezone ?? browserZone}
+              className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm outline-none focus-visible:ring-1 focus-visible:ring-ring"
+            >
+              {zones.map((z) => (
+                <option key={z} value={z}>
+                  {z}
+                </option>
+              ))}
+            </select>
+          </label>
           <StatusLine status={status} />
           <Button type="submit" disabled={pending}>
             {pending ? "…" : "Save profile"}
           </Button>
         </form>
+      </CardContent>
+    </Card>
+  );
+}
+
+export function AppearanceCard() {
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Appearance</CardTitle>
+        <CardDescription>
+          Choose a light or dark theme, or follow your system setting. Saved on this device.
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        <ThemeToggle />
       </CardContent>
     </Card>
   );
@@ -134,7 +175,7 @@ function Avatar({ name, image }: { name: string; image: string | null }) {
   );
 }
 
-function EmailCard({ email }: { email: string }) {
+export function EmailCard({ email }: { email: string }) {
   const [pending, startTransition] = useTransition();
   const [status, setStatus] = useState<Status>(null);
 
@@ -186,7 +227,7 @@ function EmailCard({ email }: { email: string }) {
   );
 }
 
-function CompanyCard({ name, canEdit }: { name: string; canEdit: boolean }) {
+export function CompanyCard({ name, canEdit }: { name: string; canEdit: boolean }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [status, setStatus] = useState<Status>(null);

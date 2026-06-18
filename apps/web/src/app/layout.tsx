@@ -1,9 +1,8 @@
 import type { ReactNode } from "react";
-import Link from "next/link";
 import { Toaster } from "sonner";
 
-import { AccountControl } from "@/components/account-control";
-import { MainNav } from "@/components/main-nav";
+import { AppSidebar } from "@/components/app-sidebar";
+import { ThemeProvider } from "@/components/theme-provider";
 
 import "./globals.css";
 
@@ -14,24 +13,17 @@ export const metadata = {
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <body className="min-h-screen antialiased">
-        <header className="sticky top-0 z-10 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-          <div className="mx-auto flex h-12 max-w-6xl items-center gap-8 px-4">
-            <Link
-              href="/backlog"
-              className="text-sm font-semibold tracking-tight"
-            >
-              SpecBoard
-            </Link>
-            <MainNav />
-            <div className="ml-auto">
-              <AccountControl />
-            </div>
+        <ThemeProvider>
+          <div className="flex min-h-screen">
+            <AppSidebar />
+            <main className="min-w-0 flex-1">
+              <div className="mx-auto max-w-6xl px-6 py-8">{children}</div>
+            </main>
           </div>
-        </header>
-        <main className="mx-auto max-w-6xl px-4 py-8">{children}</main>
-        <Toaster position="bottom-right" richColors closeButton />
+          <Toaster position="bottom-right" richColors closeButton />
+        </ThemeProvider>
       </body>
     </html>
   );

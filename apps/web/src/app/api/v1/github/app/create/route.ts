@@ -40,12 +40,12 @@ export async function GET(req: Request) {
 
   const membership = await getMembership(db, user.id);
   if (!membership || membership.role !== "admin") {
-    return htmlRedirect("/repositories?error=forbidden");
+    return htmlRedirect("/settings/repositories?error=forbidden");
   }
 
   const org = new URL(req.url).searchParams.get("org")?.trim() ?? "";
   if (org && !isValidOwner(org)) {
-    return htmlRedirect("/repositories?error=org");
+    return htmlRedirect("/settings/repositories?error=org");
   }
 
   const origin = appOriginFromRequest(req);

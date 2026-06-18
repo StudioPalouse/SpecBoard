@@ -41,7 +41,7 @@ export async function GET(req: Request) {
 
   const membership = await getMembership(db, user.id);
   if (!membership || membership.role !== "admin") {
-    return redirectTo("/repositories?error=forbidden");
+    return redirectTo("/settings/repositories?error=forbidden");
   }
 
   // CSRF: the state must match the nonce we set when starting the flow.
@@ -49,7 +49,7 @@ export async function GET(req: Request) {
   const expected = jar.get(APP_SETUP_COOKIE)?.value;
   jar.delete(APP_SETUP_COOKIE);
   if (!code || !state || !expected || state !== expected) {
-    return redirectTo("/repositories?error=setup");
+    return redirectTo("/settings/repositories?error=setup");
   }
 
   let result: ConversionResult;
@@ -69,7 +69,7 @@ export async function GET(req: Request) {
     result = (await res.json()) as ConversionResult;
   } catch (err) {
     console.error("[github] app manifest conversion failed:", err);
-    return redirectTo("/repositories?error=exchange");
+    return redirectTo("/settings/repositories?error=exchange");
   }
 
   try {
@@ -82,8 +82,8 @@ export async function GET(req: Request) {
     });
   } catch (err) {
     console.error("[github] failed to store app credentials:", err);
-    return redirectTo("/repositories?error=store");
+    return redirectTo("/settings/repositories?error=store");
   }
 
-  return redirectTo("/repositories?setup=done");
+  return redirectTo("/settings/repositories?setup=done");
 }
