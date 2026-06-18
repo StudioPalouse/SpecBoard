@@ -4,11 +4,12 @@ import { authorizeWrite, resolveReadScope } from "@/lib/auth-session";
 import {
   FeatureNotFoundError,
   InvalidPatchError,
+  deleteWorkItem,
   parseFeaturePatch,
   patchFeature,
 } from "@/lib/features-service";
 import { getStore } from "@/lib/store";
-import { RelationError } from "@/lib/store/types";
+import { FeatureError, RelationError } from "@/lib/store/types";
 
 export const dynamic = "force-dynamic";
 
@@ -60,6 +61,29 @@ export async function PATCH(req: Request, { params }: Params) {
       return Response.json({ error: err.message }, { status: 404 });
     }
     if (err instanceof InvalidPatchError || err instanceof RelationError) {
+      return Response.json({ error: err.message }, { status: 422 });
+    }
+    throw err;
+  }
+}
+
+/**
+ * DELETE /api/v1/features/:specId — delete a DB-native work item
+ * (initiative/epic). Spec-backed items can't be deleted here (the store
+ * rejects them); their children are orphaned, not cascade-deleted.
+ */
+export async function DELETE(req: Request, { params }: Params) {
+  const authz = await authorizeWrite(req);
+  if (!authz.ok) return authz.response;
+
+  const { specId } = await params;
+  try {
+    await deleteWorkItem(specId, authz.scope ?? undefined);
+    for (const path of ["/backlog", "/board", "/roadmap"]) revalidatePath(path);
+    revalidatePath("/feature/[id]", "page");
+    return Response.json({ ok: true });
+  } catch (err) {
+    if (err instanceof FeatureError) {
       return Response.json({ error: err.message }, { status: 422 });
     }
     throw err;

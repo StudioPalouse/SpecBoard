@@ -134,6 +134,7 @@ server.tool(
           .map((f) => ({
             specId: f.specId,
             title: f.title,
+            level: f.level,
             status: f.status,
             priority: f.priority,
             estimate: f.estimate,
@@ -197,6 +198,7 @@ server.tool(
       return text({
         specId: row.specId,
         title: row.title,
+        level: row.level,
         status: row.status,
         priority: row.priority,
         estimate: row.estimate,
@@ -206,6 +208,7 @@ server.tool(
         path: row.index?.path,
         parentSpecId,
         children,
+        // DB-native items (initiatives/epics) have no spec content.
         content: row.index?.content ?? "",
       });
     } catch (err) {

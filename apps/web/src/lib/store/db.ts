@@ -1,6 +1,16 @@
-import { extractSections, rollUpEstimates } from "@specboard/core";
+import { randomUUID } from "node:crypto";
+
+import {
+  extractSections,
+  isLeafLevel,
+  isValidParentLevel,
+  resolveLevels,
+  rollUpEstimates,
+  type WorkspaceLevel,
+} from "@specboard/core";
 import {
   and,
+  asc,
   boardPreferences,
   createDb,
   desc,
@@ -14,12 +24,15 @@ import {
   sql,
   specIndex,
   users,
+  workspaceLevels,
   type Database,
 } from "@specboard/db";
 
 import {
+  FeatureError,
   RelationError,
   type BoardPreferences,
+  type CreateFeatureInput,
   type CustomFieldValue,
   type FeatureDetail,
   type FeaturePatch,
@@ -198,6 +211,8 @@ export class DbStore implements FeatureStore {
       return rows.map((row) => ({
         specId: row.specId,
         title: row.title,
+        level: row.level,
+        isDbNative: row.repoId === null,
         status: row.status,
         priority: row.priority,
         estimate: row.estimate,
@@ -389,6 +404,8 @@ export class DbStore implements FeatureStore {
       return {
         specId: row.specId,
         title: row.title,
+        level: row.level,
+        isDbNative: row.repoId === null,
         status: row.status,
         priority: row.priority,
         estimate: row.estimate,
@@ -414,6 +431,132 @@ export class DbStore implements FeatureStore {
         githubSummary,
         githubLinks,
       };
+    });
+  }
+
+  /** The workspace's hierarchy levels, ordered top → leaf (default if none). */
+  private async levelsIn(tx: Tx, workspaceId: string): Promise<WorkspaceLevel[]> {
+    const rows = await tx
+      .select({
+        key: workspaceLevels.key,
+        label: workspaceLevels.label,
+        position: workspaceLevels.position,
+        isLeaf: workspaceLevels.isLeaf,
+      })
+      .from(workspaceLevels)
+      .where(eq(workspaceLevels.workspaceId, workspaceId))
+      .orderBy(asc(workspaceLevels.position));
+    return resolveLevels(rows);
+  }
+
+  async listLevels(scope?: WorkspaceScope): Promise<WorkspaceLevel[]> {
+    return this.scoped(scope, (tx) => this.levelsIn(tx, scope!.workspaceId));
+  }
+
+  async createFeature(
+    input: CreateFeatureInput,
+    scope?: WorkspaceScope,
+  ): Promise<FeatureRecord> {
+    return this.scoped(scope, async (tx) => {
+      const ws = scope!.workspaceId;
+      const levels = await this.levelsIn(tx, ws);
+
+      const title = input.title.trim();
+      if (!title) throw new FeatureError("Title is required.");
+      if (!levels.some((l) => l.key === input.level))
+        throw new FeatureError(`Unknown level: ${input.level}`);
+      if (isLeafLevel(input.level, levels))
+        throw new FeatureError(
+          "Leaf-level items come from specs and can't be created here.",
+        );
+
+      // Resolve + validate the parent (must be exactly one level up).
+      let parentId: string | null = null;
+      if (input.parentSpecId) {
+        const parent = await tx
+          .select({ id: features.id, level: features.level })
+          .from(features)
+          .where(
+            and(
+              eq(features.specId, input.parentSpecId),
+              eq(features.workspaceId, ws),
+            ),
+          );
+        if (!parent[0])
+          throw new FeatureError(`Unknown parent: ${input.parentSpecId}`);
+        if (!isValidParentLevel(input.level, parent[0].level, levels))
+          throw new FeatureError(
+            `A ${input.level} can't sit under a ${parent[0].level}.`,
+          );
+        parentId = parent[0].id;
+      } else if (!isValidParentLevel(input.level, null, levels)) {
+        throw new FeatureError(`A ${input.level} requires a parent.`);
+      }
+
+      // DB-native items have no repo/spec; spec_id mirrors the row id so every
+      // row stays uniformly routable by specId.
+      const id = randomUUID();
+      const [row] = await tx
+        .insert(features)
+        .values({
+          id,
+          workspaceId: ws,
+          repoId: null,
+          specId: id,
+          level: input.level,
+          title,
+          status: input.status ?? "backlog",
+          priority: input.priority ?? null,
+          estimate: input.estimate ?? null,
+          assigneeId: input.assigneeId ?? null,
+          roadmapQuarter: input.roadmapQuarter ?? null,
+          tags: input.tags ?? [],
+          parentId,
+        })
+        .returning();
+      if (!row) throw new FeatureError("Failed to create work item.");
+
+      return {
+        specId: row.specId,
+        title: row.title,
+        level: row.level,
+        isDbNative: true,
+        status: row.status,
+        priority: row.priority,
+        estimate: row.estimate,
+        rolledEstimate: row.estimate,
+        rank: row.rank,
+        tags: row.tags,
+        roadmapQuarter: row.roadmapQuarter,
+        assigneeId: row.assigneeId,
+        customFields: toCustomFields(row.customFields),
+        path: "",
+        blocksCount: 0,
+        blockedByCount: 0,
+        parentSpecId: input.parentSpecId ?? null,
+        childCount: 0,
+        childDoneCount: 0,
+        githubSummary: emptyAgg(),
+      } satisfies FeatureRecord;
+    });
+  }
+
+  async deleteFeature(specId: string, scope?: WorkspaceScope): Promise<void> {
+    await this.scoped(scope, async (tx) => {
+      const ws = scope!.workspaceId;
+      const row = await tx
+        .select({ id: features.id, repoId: features.repoId })
+        .from(features)
+        .where(and(eq(features.specId, specId), eq(features.workspaceId, ws)));
+      if (!row[0]) throw new FeatureError(`Unknown work item: ${specId}`);
+      if (row[0].repoId !== null)
+        throw new FeatureError(
+          "Spec-backed items can't be deleted here — remove the spec in git.",
+        );
+      // Children's parent_id is ON DELETE SET NULL, so they're orphaned, not deleted.
+      await tx
+        .delete(features)
+        .where(and(eq(features.id, row[0].id), eq(features.workspaceId, ws)));
     });
   }
 

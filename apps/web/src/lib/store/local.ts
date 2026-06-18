@@ -2,11 +2,21 @@ import { randomUUID } from "node:crypto";
 import { promises as fs } from "node:fs";
 import path from "node:path";
 
-import { parseSpec, rollUpEstimates } from "@specboard/core";
+import {
+  isLeafLevel,
+  isValidParentLevel,
+  leafLevel,
+  parseSpec,
+  resolveLevels,
+  rollUpEstimates,
+  type WorkspaceLevel,
+} from "@specboard/core";
 
 import {
+  FeatureError,
   RelationError,
   type BoardPreferences,
+  type CreateFeatureInput,
   type CustomFieldValue,
   type FeatureDetail,
   type FeaturePatch,
@@ -21,6 +31,21 @@ import {
   type SavedViewInput,
   type WorkspaceScope,
 } from "./types";
+
+/** A DB-native work item (initiative/epic) persisted in local file mode. */
+interface LocalItem {
+  /** Stable id, used as the public specId. */
+  id: string;
+  title: string;
+  level: string;
+  status: string;
+  priority: number | null;
+  estimate: number | null;
+  assigneeId: string | null;
+  roadmapQuarter: string | null;
+  tags: string[];
+  parentSpecId: string | null;
+}
 
 /** Zero GitHub-link aggregate; file mode has no GitHub connection. */
 function emptyGithubSummary(): GithubLinkAggregate {
@@ -122,6 +147,28 @@ export class LocalFileStore implements FeatureStore {
     return path.join(this.root, ".specboard", "local-board-prefs.json");
   }
 
+  private get itemsPath() {
+    return path.join(this.root, ".specboard", "local-items.json");
+  }
+
+  /** DB-native work items (initiatives/epics) persisted alongside metadata. */
+  private async readItems(): Promise<LocalItem[]> {
+    try {
+      return JSON.parse(await fs.readFile(this.itemsPath, "utf8")) as LocalItem[];
+    } catch {
+      return [];
+    }
+  }
+
+  private async writeItems(items: LocalItem[]): Promise<void> {
+    await fs.mkdir(path.dirname(this.itemsPath), { recursive: true });
+    await fs.writeFile(
+      this.itemsPath,
+      JSON.stringify(items, null, 2) + "\n",
+      "utf8",
+    );
+  }
+
   private async readMetadata(): Promise<MetadataFile> {
     try {
       return JSON.parse(
@@ -158,10 +205,12 @@ export class LocalFileStore implements FeatureStore {
   }
 
   private async loadAll(): Promise<FeatureDetail[]> {
-    const [files, meta] = await Promise.all([
+    const [files, meta, items] = await Promise.all([
       this.walkSpecFiles(this.specsDir),
       this.readMetadata(),
+      this.readItems(),
     ]);
+    const leafKey = leafLevel().key;
     const features: FeatureDetail[] = [];
     for (const file of files) {
       const raw = await fs.readFile(file, "utf8");
@@ -176,6 +225,8 @@ export class LocalFileStore implements FeatureStore {
         specId: parsed.frontmatter.id,
         title: parsed.frontmatter.title,
         kind: parsed.frontmatter.kind,
+        level: leafKey,
+        isDbNative: false,
         status: m.status ?? "backlog",
         priority: m.priority ?? null,
         estimate: m.estimate ?? null,
@@ -193,6 +244,39 @@ export class LocalFileStore implements FeatureStore {
         blocksCount: 0,
         blockedByCount: 0,
         parentSpecId: m.parentSpecId ?? null,
+        parentTitle: null,
+        children: [],
+        childCount: 0,
+        childDoneCount: 0,
+        githubSummary: emptyGithubSummary(),
+        githubLinks: [],
+      });
+    }
+    // DB-native items (initiatives/epics) — no spec/content; merged into the
+    // same set so hierarchy roll-ups span all levels.
+    for (const item of items) {
+      features.push({
+        specId: item.id,
+        title: item.title,
+        level: item.level,
+        isDbNative: true,
+        status: item.status,
+        priority: item.priority,
+        estimate: item.estimate,
+        rolledEstimate: null, // filled in by attachHierarchy
+        rank: null,
+        tags: item.tags ?? [],
+        roadmapQuarter: item.roadmapQuarter,
+        assigneeId: item.assigneeId,
+        assigneeName: null,
+        customFields: {},
+        path: "",
+        content: "",
+        sections: [],
+        relations: [],
+        blocksCount: 0,
+        blockedByCount: 0,
+        parentSpecId: item.parentSpecId ?? null,
         parentTitle: null,
         children: [],
         childCount: 0,
@@ -280,9 +364,104 @@ export class LocalFileStore implements FeatureStore {
     patch: FeaturePatch,
     _scope?: WorkspaceScope,
   ): Promise<void> {
+    // DB-native items live in their own file, not the spec-metadata map.
+    const items = await this.readItems();
+    const idx = items.findIndex((i) => i.id === specId);
+    if (idx >= 0) {
+      const it = items[idx]!;
+      if (patch.status !== undefined) it.status = patch.status;
+      if (patch.priority !== undefined) it.priority = patch.priority;
+      if (patch.estimate !== undefined) it.estimate = patch.estimate;
+      if (patch.tags !== undefined) it.tags = patch.tags;
+      if (patch.roadmapQuarter !== undefined) it.roadmapQuarter = patch.roadmapQuarter;
+      if (patch.assigneeId !== undefined) it.assigneeId = patch.assigneeId;
+      if (patch.parentSpecId !== undefined) it.parentSpecId = patch.parentSpecId;
+      await this.writeItems(items);
+      return;
+    }
     const meta = await this.readMetadata();
     meta[specId] = { ...meta[specId], ...patch };
     await this.writeMetadata(meta);
+  }
+
+  async listLevels(_scope?: WorkspaceScope): Promise<WorkspaceLevel[]> {
+    // Local file mode uses the default hierarchy (no per-workspace config).
+    return resolveLevels();
+  }
+
+  async createFeature(
+    input: CreateFeatureInput,
+    _scope?: WorkspaceScope,
+  ): Promise<FeatureRecord> {
+    const levels = resolveLevels();
+    const title = input.title.trim();
+    if (!title) throw new FeatureError("Title is required.");
+    if (!levels.some((l) => l.key === input.level))
+      throw new FeatureError(`Unknown level: ${input.level}`);
+    if (isLeafLevel(input.level, levels))
+      throw new FeatureError(
+        "Leaf-level items come from specs and can't be created here.",
+      );
+
+    if (input.parentSpecId) {
+      const all = await this.loadAll();
+      const parent = all.find((f) => f.specId === input.parentSpecId);
+      if (!parent) throw new FeatureError(`Unknown parent: ${input.parentSpecId}`);
+      if (!isValidParentLevel(input.level, parent.level, levels))
+        throw new FeatureError(
+          `A ${input.level} can't sit under a ${parent.level}.`,
+        );
+    } else if (!isValidParentLevel(input.level, null, levels)) {
+      throw new FeatureError(`A ${input.level} requires a parent.`);
+    }
+
+    const id = randomUUID();
+    const item: LocalItem = {
+      id,
+      title,
+      level: input.level,
+      status: input.status ?? "backlog",
+      priority: input.priority ?? null,
+      estimate: input.estimate ?? null,
+      assigneeId: input.assigneeId ?? null,
+      roadmapQuarter: input.roadmapQuarter ?? null,
+      tags: input.tags ?? [],
+      parentSpecId: input.parentSpecId ?? null,
+    };
+    const items = await this.readItems();
+    await this.writeItems([...items, item]);
+
+    return {
+      specId: id,
+      title,
+      level: item.level,
+      isDbNative: true,
+      status: item.status,
+      priority: item.priority,
+      estimate: item.estimate,
+      rolledEstimate: item.estimate,
+      rank: null,
+      tags: item.tags,
+      roadmapQuarter: item.roadmapQuarter,
+      assigneeId: item.assigneeId,
+      customFields: {},
+      path: "",
+      blocksCount: 0,
+      blockedByCount: 0,
+      parentSpecId: item.parentSpecId,
+      childCount: 0,
+      childDoneCount: 0,
+      githubSummary: emptyGithubSummary(),
+    } satisfies FeatureRecord;
+  }
+
+  async deleteFeature(specId: string, _scope?: WorkspaceScope): Promise<void> {
+    const items = await this.readItems();
+    if (!items.some((i) => i.id === specId))
+      throw new FeatureError(
+        "Spec-backed items can't be deleted here — remove the spec in git.",
+      );
+    await this.writeItems(items.filter((i) => i.id !== specId));
   }
 
   async addRelation(

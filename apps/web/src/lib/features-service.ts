@@ -6,11 +6,14 @@ import {
   type CustomFieldValue,
   type FeatureDetail,
   type FeaturePatch,
+  type FeatureRecord,
   type WorkspaceScope,
+  type WorkspaceLevel,
 } from "@/lib/store";
 import {
   RELATION_DIRECTIONS,
   type CreatableRelationDirection,
+  type CreateFeatureInput,
   type FeatureRelation,
   type RelationInput,
 } from "@/lib/store/types";
@@ -191,6 +194,99 @@ async function assertNoParentCycle(
     }
     cur = node.parentSpecId;
   }
+}
+
+/** Parse and validate an untrusted create-work-item body. */
+export function parseCreateFeatureInput(body: unknown): CreateFeatureInput {
+  if (typeof body !== "object" || body === null || Array.isArray(body)) {
+    throw new InvalidPatchError("Request body must be a JSON object.");
+  }
+  const raw = body as Record<string, unknown>;
+
+  if (typeof raw.title !== "string" || raw.title.trim() === "") {
+    throw new InvalidPatchError("title is required.");
+  }
+  if (typeof raw.level !== "string" || raw.level.trim() === "") {
+    throw new InvalidPatchError("level is required.");
+  }
+  const input: CreateFeatureInput = {
+    title: raw.title.trim(),
+    level: raw.level.trim(),
+  };
+
+  if ("parentSpecId" in raw && raw.parentSpecId !== null) {
+    if (!isUuid(raw.parentSpecId)) {
+      throw new InvalidPatchError("parentSpecId must be a UUID or null.");
+    }
+    input.parentSpecId = raw.parentSpecId;
+  }
+  if ("status" in raw) {
+    if (typeof raw.status !== "string" || raw.status === "") {
+      throw new InvalidPatchError("status must be a non-empty string.");
+    }
+    input.status = raw.status;
+  }
+  if ("priority" in raw && raw.priority !== null) {
+    if (typeof raw.priority !== "number" || !Number.isInteger(raw.priority)) {
+      throw new InvalidPatchError("priority must be an integer or null.");
+    }
+    input.priority = raw.priority;
+  }
+  if ("estimate" in raw && raw.estimate !== null) {
+    if (
+      typeof raw.estimate !== "number" ||
+      !Number.isInteger(raw.estimate) ||
+      raw.estimate < 0
+    ) {
+      throw new InvalidPatchError("estimate must be a non-negative integer or null.");
+    }
+    input.estimate = raw.estimate;
+  }
+  if ("assigneeId" in raw && raw.assigneeId !== null) {
+    if (!isUuid(raw.assigneeId)) {
+      throw new InvalidPatchError("assigneeId must be a UUID or null.");
+    }
+    input.assigneeId = raw.assigneeId;
+  }
+  if ("roadmapQuarter" in raw && raw.roadmapQuarter !== null) {
+    if (typeof raw.roadmapQuarter !== "string") {
+      throw new InvalidPatchError("roadmapQuarter must be a string or null.");
+    }
+    input.roadmapQuarter = raw.roadmapQuarter.trim() || null;
+  }
+  if ("tags" in raw) {
+    if (!Array.isArray(raw.tags) || raw.tags.some((t) => typeof t !== "string")) {
+      throw new InvalidPatchError("tags must be an array of strings.");
+    }
+    input.tags = (raw.tags as string[]).map((t) => t.trim()).filter(Boolean);
+  }
+  return input;
+}
+
+/** The workspace's hierarchy levels (top → leaf). */
+export async function listLevels(
+  scope?: WorkspaceScope,
+): Promise<WorkspaceLevel[]> {
+  const store = await getStore();
+  return store.listLevels(scope);
+}
+
+/** Create a DB-native work item (initiative/epic). Validation lives in the store. */
+export async function createWorkItem(
+  input: CreateFeatureInput,
+  scope?: WorkspaceScope,
+): Promise<FeatureRecord> {
+  const store = await getStore();
+  return store.createFeature(input, scope);
+}
+
+/** Delete a DB-native work item by id. */
+export async function deleteWorkItem(
+  specId: string,
+  scope?: WorkspaceScope,
+): Promise<void> {
+  const store = await getStore();
+  await store.deleteFeature(specId, scope);
 }
 
 /** Parse and validate an untrusted relation-create body. */

@@ -1,6 +1,7 @@
 import { relations } from "drizzle-orm";
 import {
   boolean,
+  foreignKey,
   index,
   integer,
   jsonb,
@@ -29,6 +30,34 @@ export const workspaces = pgTable("workspaces", {
   slug: text("slug").notNull().unique(),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
+
+/**
+ * A workspace's work-tracking hierarchy levels (e.g. Initiative → Epic →
+ * Feature). Seeded with the default three levels per workspace; teams edit
+ * depth/labels in Settings. The deepest level (`is_leaf`) is the git-backed
+ * spec; higher levels are DB-native. `features.level` is a composite FK into
+ * (workspace_id, key) here, so a feature's level always belongs to its own
+ * workspace and can never reference an unknown key.
+ */
+export const workspaceLevels = pgTable(
+  "workspace_levels",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    workspaceId: uuid("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    key: text("key").notNull(),
+    label: text("label").notNull(),
+    /** Depth, ascending: 0 is the top level; the largest is the leaf. */
+    position: integer("position").notNull(),
+    isLeaf: boolean("is_leaf").notNull().default(false),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    unique("workspace_levels_ws_key_uq").on(t.workspaceId, t.key),
+    index("workspace_levels_ws_idx").on(t.workspaceId),
+  ],
+);
 
 export const members = pgTable(
   "members",
@@ -94,11 +123,24 @@ export const features = pgTable(
     workspaceId: uuid("workspace_id")
       .notNull()
       .references(() => workspaces.id, { onDelete: "cascade" }),
-    repoId: uuid("repo_id")
-      .notNull()
-      .references(() => repositories.id, { onDelete: "cascade" }),
-    /** Stable id from the spec's frontmatter; the git<->DB join key. */
+    /**
+     * Source repository, or NULL for DB-native items (initiatives/epics) that
+     * live above the spec leaf and have no git backing.
+     */
+    repoId: uuid("repo_id").references(() => repositories.id, {
+      onDelete: "cascade",
+    }),
+    /**
+     * Stable id, the public route + join key. For spec-backed rows it's the
+     * spec's frontmatter `id`; for DB-native items (which have no spec) the app
+     * sets it equal to the row `id`, so every row stays uniformly routable.
+     */
     specId: uuid("spec_id").notNull(),
+    /**
+     * Hierarchy level key (composite FK to workspace_levels below). Spec-backed
+     * rows are always the leaf level; DB-native rows take a higher level.
+     */
+    level: text("level").notNull().default("feature"),
     title: text("title").notNull(),
     status: text("status").notNull().default("backlog"),
     assigneeId: uuid("assignee_id"),
@@ -126,6 +168,12 @@ export const features = pgTable(
     unique("features_repo_spec_uq").on(t.repoId, t.specId),
     index("features_workspace_status_idx").on(t.workspaceId, t.status),
     index("features_parent_idx").on(t.parentId),
+    index("features_workspace_level_idx").on(t.workspaceId, t.level),
+    foreignKey({
+      columns: [t.workspaceId, t.level],
+      foreignColumns: [workspaceLevels.workspaceId, workspaceLevels.key],
+      name: "features_workspace_level_fk",
+    }),
   ],
 );
 
@@ -361,6 +409,7 @@ export const workspaceRelations = relations(workspaces, ({ many }) => ({
   members: many(members),
   repositories: many(repositories),
   features: many(features),
+  levels: many(workspaceLevels),
 }));
 
 export const repositoryRelations = relations(repositories, ({ one, many }) => ({

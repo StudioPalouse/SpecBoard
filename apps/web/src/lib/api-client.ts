@@ -3,8 +3,10 @@
 import type {
   BoardPreferences,
   CreatableRelationDirection,
+  CreateFeatureInput,
   FeatureDetail,
   FeaturePatch,
+  FeatureRecord,
   FeatureRelation,
   GithubLink,
   GithubLinkInput,
@@ -52,6 +54,37 @@ export async function patchFeature(
   if (!res.ok) {
     const body = (await res.json().catch(() => null)) as { error?: string } | null;
     throw new Error(body?.error ?? `PATCH failed with ${res.status}`);
+  }
+}
+
+/** Create a DB-native work item (initiative/epic); returns the new record. */
+export async function createWorkItem(
+  input: CreateFeatureInput,
+): Promise<FeatureRecord> {
+  const res = await fetch("/api/v1/features", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(input),
+  });
+  if (res.status === 401) throw new AuthRequiredError();
+  const body = (await res.json().catch(() => null)) as
+    | { feature?: FeatureRecord; error?: string }
+    | null;
+  if (!res.ok || !body?.feature) {
+    throw new Error(body?.error ?? `Create failed with ${res.status}`);
+  }
+  return body.feature;
+}
+
+/** Delete a DB-native work item by id. */
+export async function deleteWorkItem(specId: string): Promise<void> {
+  const res = await fetch(`/api/v1/features/${encodeURIComponent(specId)}`, {
+    method: "DELETE",
+  });
+  if (res.status === 401) throw new AuthRequiredError();
+  if (!res.ok) {
+    const body = (await res.json().catch(() => null)) as { error?: string } | null;
+    throw new Error(body?.error ?? `DELETE failed with ${res.status}`);
   }
 }
 

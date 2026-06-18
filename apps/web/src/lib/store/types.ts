@@ -1,4 +1,6 @@
-import type { SpecSection } from "@specboard/core";
+import type { SpecSection, WorkspaceLevel } from "@specboard/core";
+
+export type { WorkspaceLevel };
 
 /** A value stored for a team-defined custom field (see RepoConfig.fields). */
 export type CustomFieldValue = string | number | boolean | string[] | null;
@@ -9,6 +11,13 @@ export interface FeatureRecord {
   specId: string;
   title: string;
   kind?: string;
+  /**
+   * Hierarchy level key (see WorkspaceLevel). Spec-backed rows are the leaf
+   * level; DB-native initiatives/epics take a higher level.
+   */
+  level: string;
+  /** True for DB-native items (initiatives/epics) — no repo/spec backing. */
+  isDbNative: boolean;
   status: string;
   priority: number | null;
   /** Effort estimate in points (against RepoConfig.estimate.scale), or null. */
@@ -165,6 +174,26 @@ export type FeaturePatch = Partial<
 >;
 
 /**
+ * Fields to create a DB-native work item (an initiative/epic — a non-leaf
+ * level). Leaf items come from git/spec sync, not this path. `level` must be a
+ * non-leaf level and `parentSpecId`, when set, the level immediately above.
+ */
+export interface CreateFeatureInput {
+  title: string;
+  level: string;
+  parentSpecId?: string | null;
+  status?: string;
+  priority?: number | null;
+  estimate?: number | null;
+  assigneeId?: string | null;
+  roadmapQuarter?: string | null;
+  tags?: string[];
+}
+
+/** Raised when a work item can't be created/deleted (bad level, has a spec, …). */
+export class FeatureError extends Error {}
+
+/**
  * Per-request tenant context. Carries the acting user and their workspace so
  * the DB store can both filter rows by `workspaceId` and set the `app.user_id`
  * session variable that RLS keys on. `undefined` only in local file mode,
@@ -215,6 +244,15 @@ export interface BoardPreferences {
 export interface FeatureStore {
   listFeatures(scope?: WorkspaceScope): Promise<FeatureRecord[]>;
   getFeature(specId: string, scope?: WorkspaceScope): Promise<FeatureDetail | null>;
+  /** The workspace's hierarchy levels, ordered top → leaf. */
+  listLevels(scope?: WorkspaceScope): Promise<WorkspaceLevel[]>;
+  /** Create a DB-native work item (initiative/epic). Returns the new record. */
+  createFeature(
+    input: CreateFeatureInput,
+    scope?: WorkspaceScope,
+  ): Promise<FeatureRecord>;
+  /** Delete a DB-native work item by id. Spec-backed items can't be deleted here. */
+  deleteFeature(specId: string, scope?: WorkspaceScope): Promise<void>;
   updateFeature(
     specId: string,
     patch: FeaturePatch,

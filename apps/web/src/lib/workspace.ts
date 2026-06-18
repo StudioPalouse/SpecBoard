@@ -1,4 +1,13 @@
-import { asc, eq, members, users, workspaces, type Database } from "@specboard/db";
+import {
+  asc,
+  eq,
+  members,
+  users,
+  workspaceLevels,
+  workspaces,
+  type Database,
+} from "@specboard/db";
+import { DEFAULT_LEVELS } from "@specboard/core";
 
 export type Workspace = typeof workspaces.$inferSelect;
 export type Member = typeof members.$inferSelect;
@@ -161,6 +170,22 @@ export async function createWorkspaceWithOwner(
     .insert(members)
     .values({ workspaceId: workspace.id, userId, role: "admin" })
     .onConflictDoNothing({ target: [members.workspaceId, members.userId] });
+
+  // Seed the default work-tracking hierarchy (Initiative → Epic → Feature).
+  await db
+    .insert(workspaceLevels)
+    .values(
+      DEFAULT_LEVELS.map((l) => ({
+        workspaceId: workspace.id,
+        key: l.key,
+        label: l.label,
+        position: l.position,
+        isLeaf: l.isLeaf,
+      })),
+    )
+    .onConflictDoNothing({
+      target: [workspaceLevels.workspaceId, workspaceLevels.key],
+    });
 
   return workspace;
 }

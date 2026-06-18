@@ -12,10 +12,16 @@ import { fileURLToPath } from "node:url";
 
 import { eq } from "drizzle-orm";
 
-import { parseSpec } from "@specboard/core";
+import { DEFAULT_LEVELS, parseSpec } from "@specboard/core";
 
 import { createDb } from "./client.js";
-import { features, repositories, specIndex, workspaces } from "./schema.js";
+import {
+  features,
+  repositories,
+  specIndex,
+  workspaceLevels,
+  workspaces,
+} from "./schema.js";
 
 const repoRoot = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
@@ -74,6 +80,22 @@ const [workspace] = await db
   .values({ name: "Local", slug: "local" })
   .onConflictDoUpdate({ target: workspaces.slug, set: { name: "Local" } })
   .returning();
+
+// Seed the default hierarchy levels so feature inserts satisfy the level FK.
+await db
+  .insert(workspaceLevels)
+  .values(
+    DEFAULT_LEVELS.map((l) => ({
+      workspaceId: workspace!.id,
+      key: l.key,
+      label: l.label,
+      position: l.position,
+      isLeaf: l.isLeaf,
+    })),
+  )
+  .onConflictDoNothing({
+    target: [workspaceLevels.workspaceId, workspaceLevels.key],
+  });
 
 const [repository] = await db
   .insert(repositories)
