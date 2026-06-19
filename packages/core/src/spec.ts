@@ -12,6 +12,12 @@ export const specFrontmatterSchema = z.object({
   title: z.string().min(1),
   /** Optional author-declared kind, e.g. "feature" | "epic" | "spike". */
   kind: z.string().optional(),
+  /**
+   * Optional grouping key: the Feature this spec's work item belongs under.
+   * When present it overrides the folder-based mapping during sync (ADR 0002);
+   * specs sharing a `feature` value land under the same Feature grouping.
+   */
+  feature: z.string().optional(),
 });
 
 export type SpecFrontmatter = z.infer<typeof specFrontmatterSchema>;

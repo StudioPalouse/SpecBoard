@@ -271,6 +271,7 @@ export interface SyncResult {
   upserted: number;
   skipped: number;
   idsInjected: number;
+  featuresCreated: number;
 }
 
 export interface ConnectRepoInput {
