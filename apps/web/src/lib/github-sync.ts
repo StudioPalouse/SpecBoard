@@ -18,6 +18,7 @@ import {
 } from "@specboard/git";
 
 import { getGithubApp } from "@/lib/github-app";
+import { ensureDefaultProduct } from "@/lib/workspace";
 
 export type RepoRecord = typeof repositories.$inferSelect;
 
@@ -129,6 +130,9 @@ export async function syncRepository(db: Database, repo: RepoRecord): Promise<Sy
 
   const reconciled = await reconcileSpecs(client, globs);
 
+  // Synced specs land in the workspace's default product (until moved later).
+  const productId = await ensureDefaultProduct(db, repo.workspaceId);
+
   // Existing blobShas keyed by specId, to skip unchanged files.
   const existingRows = await db
     .select({ specId: features.specId, blobSha: specIndex.blobSha })
@@ -156,9 +160,12 @@ export async function syncRepository(db: Database, repo: RepoRecord): Promise<Sy
         .values({
           workspaceId: repo.workspaceId,
           repoId: repo.id,
+          productId,
           specId,
           title: item.spec.frontmatter.title,
         })
+        // productId is set only on insert; an item moved to another product
+        // later keeps its assignment across re-syncs.
         .onConflictDoUpdate({
           target: [features.repoId, features.specId],
           set: { title: item.spec.frontmatter.title, updatedAt: new Date() },

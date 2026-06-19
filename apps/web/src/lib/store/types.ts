@@ -1,6 +1,12 @@
-import type { SpecSection, WorkspaceLevel } from "@specboard/core";
+import type {
+  ProductAccess,
+  ProductRole,
+  ProductVisibility,
+  SpecSection,
+  WorkspaceLevel,
+} from "@specboard/core";
 
-export type { WorkspaceLevel };
+export type { ProductAccess, ProductRole, ProductVisibility, WorkspaceLevel };
 
 /** A value stored for a team-defined custom field (see RepoConfig.fields). */
 export type CustomFieldValue = string | number | boolean | string[] | null;
@@ -18,6 +24,8 @@ export interface FeatureRecord {
   level: string;
   /** True for DB-native items (initiatives/epics) — no repo/spec backing. */
   isDbNative: boolean;
+  /** Owning product (sibling backlog), or null for legacy/unassigned rows. */
+  productId: string | null;
   status: string;
   priority: number | null;
   /** Effort estimate in points (against RepoConfig.estimate.scale), or null. */
@@ -182,6 +190,8 @@ export type FeaturePatch = Partial<
 export interface CreateFeatureInput {
   title: string;
   level: string;
+  /** Owning product; defaults to the workspace's default product when omitted. */
+  productId?: string | null;
   parentSpecId?: string | null;
   status?: string;
   priority?: number | null;
@@ -190,6 +200,51 @@ export interface CreateFeatureInput {
   roadmapQuarter?: string | null;
   tags?: string[];
 }
+
+/** A product (sibling backlog) as the UI consumes it. */
+export interface ProductRecord {
+  id: string;
+  /** Stable slug used in the `?product=` URL. */
+  key: string;
+  name: string;
+  description: string | null;
+  visibility: ProductVisibility;
+  position: number;
+  /** Count of work items in this product. */
+  itemCount: number;
+  /** The acting user's explicit role on this product, or null (org admins
+   * implicitly manage all — see PageAccess.role). */
+  viewerRole: ProductRole | null;
+}
+
+export interface CreateProductInput {
+  name: string;
+  description?: string | null;
+  visibility?: ProductVisibility;
+}
+
+export type ProductPatch = Partial<{
+  name: string;
+  description: string | null;
+  visibility: ProductVisibility;
+  position: number;
+}>;
+
+/** A user's membership of one product, joined to their identity. */
+export interface ProductMemberRecord {
+  userId: string;
+  name: string;
+  email: string;
+  role: ProductRole;
+}
+
+export interface ProductMemberInput {
+  userId: string;
+  role: ProductRole;
+}
+
+/** Raised when a product can't be created/updated/deleted (in use, dup, …). */
+export class ProductError extends Error {}
 
 /**
  * One level in a hierarchy-config update, ordered top → leaf in the array.
@@ -269,6 +324,43 @@ export interface FeatureStore {
     levels: LevelUpdate[],
     scope?: WorkspaceScope,
   ): Promise<WorkspaceLevel[]>;
+  /** The acting user's effective product access (org-admin flag + per-product
+   * grants), used for read-filtering and write authorization. */
+  getProductAccess(scope?: WorkspaceScope): Promise<ProductAccess>;
+  /** Products (sibling backlogs) the acting user can see, ordered by position. */
+  listProducts(scope?: WorkspaceScope): Promise<ProductRecord[]>;
+  /** A single product by its key (the `?product=` slug), or null. */
+  getProduct(key: string, scope?: WorkspaceScope): Promise<ProductRecord | null>;
+  /** Create a product (org-admin action). Returns the new record. */
+  createProduct(
+    input: CreateProductInput,
+    scope?: WorkspaceScope,
+  ): Promise<ProductRecord>;
+  /** Update a product's settings. Returns the updated record. */
+  updateProduct(
+    id: string,
+    patch: ProductPatch,
+    scope?: WorkspaceScope,
+  ): Promise<ProductRecord>;
+  /** Delete a product (must have no items). */
+  deleteProduct(id: string, scope?: WorkspaceScope): Promise<void>;
+  /** A product's members joined to their identities, ordered by name. */
+  listProductMembers(
+    productId: string,
+    scope?: WorkspaceScope,
+  ): Promise<ProductMemberRecord[]>;
+  /** Add or update a user's role on a product (upsert). */
+  setProductMember(
+    productId: string,
+    input: ProductMemberInput,
+    scope?: WorkspaceScope,
+  ): Promise<void>;
+  /** Remove a user's membership of a product. */
+  removeProductMember(
+    productId: string,
+    userId: string,
+    scope?: WorkspaceScope,
+  ): Promise<void>;
   /** Create a DB-native work item (initiative/epic). Returns the new record. */
   createFeature(
     input: CreateFeatureInput,
