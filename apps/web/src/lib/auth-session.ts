@@ -98,3 +98,44 @@ export function resolveReadScope(req: Request): Promise<ScopeResult> {
 export function authorizeWrite(req: Request): Promise<ScopeResult> {
   return resolveScope(req, { write: true });
 }
+
+/**
+ * Scope for an organization-admin action (creating products, managing the org).
+ * Local file mode (auth disabled) is ungated with a `null` scope.
+ */
+export async function authorizeOrgAdmin(req: Request): Promise<ScopeResult> {
+  const auth = getAuth();
+  const db = getDb();
+  if (!auth || !db) return { ok: true, scope: null };
+
+  const session = await auth.api.getSession({ headers: req.headers });
+  if (!session) {
+    return {
+      ok: false,
+      response: Response.json({ error: "Authentication required." }, { status: 401 }),
+    };
+  }
+  const membership = await getMembership(db, session.user.id);
+  if (!membership) {
+    return {
+      ok: false,
+      response: Response.json(
+        { error: "You do not belong to a workspace." },
+        { status: 403 },
+      ),
+    };
+  }
+  if (membership.role !== "admin") {
+    return {
+      ok: false,
+      response: Response.json(
+        { error: "Only an organization admin can do this." },
+        { status: 403 },
+      ),
+    };
+  }
+  return {
+    ok: true,
+    scope: { userId: session.user.id, workspaceId: membership.workspaceId },
+  };
+}

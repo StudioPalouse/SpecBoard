@@ -23,6 +23,15 @@ import {
 
 export const memberRole = pgEnum("member_role", ["admin", "pm", "ux", "eng", "viewer"]);
 
+/** A product's read visibility: `org` (every member can read) or `private`
+ * (read requires org-admin or explicit product membership). */
+export const productVisibility = pgEnum("product_visibility", ["org", "private"]);
+
+/** A user's role on a single product: `admin` (manage product + members + edit
+ * items), `editor` (edit items), `viewer` (read — only meaningful for private
+ * products, where it grants access). */
+export const productMemberRole = pgEnum("product_member_role", ["admin", "editor", "viewer"]);
+
 /** Tenant root. SaaS has many; a self-host install typically has one. */
 export const workspaces = pgTable("workspaces", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -56,6 +65,62 @@ export const workspaceLevels = pgTable(
   (t) => [
     unique("workspace_levels_ws_key_uq").on(t.workspaceId, t.key),
     index("workspace_levels_ws_idx").on(t.workspaceId),
+  ],
+);
+
+/**
+ * A product: a sibling backlog within the organization (the workspace). Each
+ * product holds its own work-tracking hierarchy (Initiative → Epic → Feature)
+ * via `features.product_id`. `visibility` gates reads: `org` products are
+ * readable by every member; `private` products require org-admin or a
+ * `product_members` row. `key` is the stable slug used in the `?product=` URL.
+ */
+export const products = pgTable(
+  "products",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    workspaceId: uuid("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    key: text("key").notNull(),
+    name: text("name").notNull(),
+    description: text("description"),
+    visibility: productVisibility("visibility").notNull().default("org"),
+    /** Manual ordering in the product switcher; ascending. */
+    position: integer("position").notNull().default(0),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    unique("products_ws_key_uq").on(t.workspaceId, t.key),
+    index("products_ws_idx").on(t.workspaceId),
+  ],
+);
+
+/**
+ * A user's role on a single product. Write access to a product's items comes
+ * from an `admin`/`editor` row here (or being an org admin); a `viewer` row
+ * grants read access to a `private` product. `userId` has no FK for the same
+ * reason as `members.user_id` (auth-disabled self-host).
+ */
+export const productMembers = pgTable(
+  "product_members",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    workspaceId: uuid("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    productId: uuid("product_id")
+      .notNull()
+      .references(() => products.id, { onDelete: "cascade" }),
+    userId: uuid("user_id").notNull(),
+    role: productMemberRole("role").notNull().default("viewer"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    unique("product_members_product_user_uq").on(t.productId, t.userId),
+    index("product_members_product_idx").on(t.productId),
+    index("product_members_user_idx").on(t.userId),
   ],
 );
 
@@ -131,6 +196,15 @@ export const features = pgTable(
       onDelete: "cascade",
     }),
     /**
+     * Owning product (sibling backlog). Nullable for legacy/unassigned rows;
+     * the app always sets it on create. `restrict` on delete so a product with
+     * items can't be removed out from under them (the service blocks it with a
+     * friendly error, mirroring level deletion).
+     */
+    productId: uuid("product_id").references(() => products.id, {
+      onDelete: "restrict",
+    }),
+    /**
      * Stable id, the public route + join key. For spec-backed rows it's the
      * spec's frontmatter `id`; for DB-native items (which have no spec) the app
      * sets it equal to the row `id`, so every row stays uniformly routable.
@@ -168,6 +242,7 @@ export const features = pgTable(
     unique("features_repo_spec_uq").on(t.repoId, t.specId),
     index("features_workspace_status_idx").on(t.workspaceId, t.status),
     index("features_parent_idx").on(t.parentId),
+    index("features_product_idx").on(t.productId),
     index("features_workspace_level_idx").on(t.workspaceId, t.level),
     foreignKey({
       columns: [t.workspaceId, t.level],
@@ -410,6 +485,23 @@ export const workspaceRelations = relations(workspaces, ({ many }) => ({
   repositories: many(repositories),
   features: many(features),
   levels: many(workspaceLevels),
+  products: many(products),
+}));
+
+export const productRelations = relations(products, ({ one, many }) => ({
+  workspace: one(workspaces, {
+    fields: [products.workspaceId],
+    references: [workspaces.id],
+  }),
+  members: many(productMembers),
+  features: many(features),
+}));
+
+export const productMemberRelations = relations(productMembers, ({ one }) => ({
+  product: one(products, {
+    fields: [productMembers.productId],
+    references: [products.id],
+  }),
 }));
 
 export const repositoryRelations = relations(repositories, ({ one, many }) => ({
@@ -428,6 +520,10 @@ export const featureRelations = relations(features, ({ one, many }) => ({
   repository: one(repositories, {
     fields: [features.repoId],
     references: [repositories.id],
+  }),
+  product: one(products, {
+    fields: [features.productId],
+    references: [products.id],
   }),
   index: one(specIndex, {
     fields: [features.id],

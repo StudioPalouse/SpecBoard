@@ -14,6 +14,7 @@ import {
   createDb,
   featureLinks,
   features,
+  products,
   repositories,
   workspaces,
   type Database,
@@ -60,26 +61,44 @@ function errorResult(err: unknown) {
 
 server.tool(
   "list_features",
-  "List features with their metadata, filterable by status/assignee/tag.",
+  "List features with their metadata, filterable by status/assignee/product.",
   {
     workspace: z
       .string()
       .describe("Workspace slug (self-host/local default: 'local')"),
     status: z.string().optional(),
     assignee: z.string().optional(),
+    product: z
+      .string()
+      .optional()
+      .describe("Product key (sibling backlog) to filter to; see list_products"),
   },
-  async ({ workspace, status, assignee }) => {
+  async ({ workspace, status, assignee, product }) => {
     try {
       const ws = await db().query.workspaces.findFirst({
         where: eq(workspaces.slug, workspace),
       });
       if (!ws)
         return errorResult(new Error(`No workspace with slug "${workspace}"`));
+      // Resolve products for output labels + the optional product filter.
+      const prods = await db()
+        .select({ id: products.id, key: products.key })
+        .from(products)
+        .where(eq(products.workspaceId, ws.id));
+      const prodKeyById = new Map(prods.map((p) => [p.id, p.key]));
+      let productId: string | undefined;
+      if (product) {
+        const match = prods.find((p) => p.key === product);
+        if (!match)
+          return errorResult(new Error(`No product with key "${product}"`));
+        productId = match.id;
+      }
       const rows = await db().query.features.findMany({
         where: and(
           eq(features.workspaceId, ws.id),
           ...(status ? [eq(features.status, status)] : []),
           ...(assignee ? [eq(features.assigneeId, assignee)] : []),
+          ...(productId ? [eq(features.productId, productId)] : []),
         ),
         with: { index: true },
       });
@@ -135,6 +154,7 @@ server.tool(
             specId: f.specId,
             title: f.title,
             level: f.level,
+            product: f.productId ? (prodKeyById.get(f.productId) ?? null) : null,
             status: f.status,
             priority: f.priority,
             estimate: f.estimate,
@@ -179,6 +199,14 @@ server.tool(
         .select({ specId: features.specId, title: features.title, status: features.status })
         .from(features)
         .where(eq(features.parentId, row.id));
+      let product: string | null = null;
+      if (row.productId) {
+        const p = await db().query.products.findFirst({
+          where: eq(products.id, row.productId),
+          columns: { key: true },
+        });
+        product = p?.key ?? null;
+      }
       // Roll the estimate up over this feature's subtree.
       const estimateRows = await db()
         .select({
@@ -199,6 +227,7 @@ server.tool(
         specId: row.specId,
         title: row.title,
         level: row.level,
+        product,
         status: row.status,
         priority: row.priority,
         estimate: row.estimate,
@@ -211,6 +240,47 @@ server.tool(
         // DB-native items (initiatives/epics) have no spec content.
         content: row.index?.content ?? "",
       });
+    } catch (err) {
+      return errorResult(err);
+    }
+  },
+);
+
+server.tool(
+  "list_products",
+  "List the products (sibling backlogs) in a workspace; each has its own hierarchy.",
+  {
+    workspace: z
+      .string()
+      .describe("Workspace slug (self-host/local default: 'local')"),
+  },
+  async ({ workspace }) => {
+    try {
+      const ws = await db().query.workspaces.findFirst({
+        where: eq(workspaces.slug, workspace),
+      });
+      if (!ws)
+        return errorResult(new Error(`No workspace with slug "${workspace}"`));
+      const rows = await db()
+        .select({
+          key: products.key,
+          name: products.name,
+          description: products.description,
+          visibility: products.visibility,
+          position: products.position,
+        })
+        .from(products)
+        .where(eq(products.workspaceId, ws.id));
+      return text(
+        rows
+          .sort((a, b) => a.position - b.position || a.name.localeCompare(b.name))
+          .map((p) => ({
+            key: p.key,
+            name: p.name,
+            description: p.description,
+            visibility: p.visibility,
+          })),
+      );
     } catch (err) {
       return errorResult(err);
     }

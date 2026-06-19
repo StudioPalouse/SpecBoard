@@ -238,6 +238,12 @@ export function parseCreateFeatureInput(body: unknown): CreateFeatureInput {
     level: raw.level.trim(),
   };
 
+  if ("productId" in raw && raw.productId !== null) {
+    if (!isUuid(raw.productId)) {
+      throw new InvalidPatchError("productId must be a UUID or null.");
+    }
+    input.productId = raw.productId;
+  }
   if ("parentSpecId" in raw && raw.parentSpecId !== null) {
     if (!isUuid(raw.parentSpecId)) {
       throw new InvalidPatchError("parentSpecId must be a UUID or null.");

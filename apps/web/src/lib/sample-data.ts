@@ -1,6 +1,8 @@
 import { extractSections } from "@specboard/core";
 import { features, repositories, specIndex, type Database } from "@specboard/db";
 
+import { ensureDefaultProduct } from "@/lib/workspace";
+
 /**
  * Self-contained sample board for first-run onboarding. Baked in (not read from
  * the repo's `specs/` dir) so it works inside the deployed container. The
@@ -87,12 +89,15 @@ export async function seedSampleData(db: Database, workspaceId: string): Promise
     .returning();
   if (!repo) throw new Error("Failed to create sample repository.");
 
+  const productId = await ensureDefaultProduct(db, workspaceId);
+
   for (const sample of SAMPLE_FEATURES) {
     const [feature] = await db
       .insert(features)
       .values({
         workspaceId,
         repoId: repo.id,
+        productId,
         specId: sample.specId,
         title: sample.title,
         status: sample.status,

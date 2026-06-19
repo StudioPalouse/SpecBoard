@@ -3,4 +3,6 @@ export * from "./status.js";
 export * from "./config.js";
 export * from "./estimate.js";
 export * from "./levels.js";
+export * from "./products.js";
+export * from "./permissions.js";
 export * from "./email-domains.js";

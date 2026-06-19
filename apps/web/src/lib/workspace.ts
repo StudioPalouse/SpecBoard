@@ -1,13 +1,15 @@
 import {
+  and,
   asc,
   eq,
   members,
+  products,
   users,
   workspaceLevels,
   workspaces,
   type Database,
 } from "@specboard/db";
-import { DEFAULT_LEVELS } from "@specboard/core";
+import { DEFAULT_LEVELS, DEFAULT_PRODUCT_KEY } from "@specboard/core";
 
 export type Workspace = typeof workspaces.$inferSelect;
 export type Member = typeof members.$inferSelect;
@@ -95,6 +97,49 @@ export async function updateWorkspace(
     .where(eq(workspaces.id, workspaceId))
     .returning();
   return rows[0] ?? null;
+}
+
+/**
+ * Ensure the workspace has its default product (the one every spec/item falls
+ * into until moved). Idempotent; returns the product id. Used on workspace
+ * bootstrap and by the spec sync so synced specs always belong to a product.
+ */
+export async function ensureDefaultProduct(
+  db: Database,
+  workspaceId: string,
+): Promise<string> {
+  const existing = await db
+    .select({ id: products.id })
+    .from(products)
+    .where(
+      and(eq(products.workspaceId, workspaceId), eq(products.key, DEFAULT_PRODUCT_KEY)),
+    )
+    .limit(1);
+  if (existing[0]) return existing[0].id;
+
+  const workspace = await getWorkspaceById(db, workspaceId);
+  const [created] = await db
+    .insert(products)
+    .values({
+      workspaceId,
+      key: DEFAULT_PRODUCT_KEY,
+      name: workspace?.name ?? "General",
+      position: 0,
+    })
+    .onConflictDoNothing({ target: [products.workspaceId, products.key] })
+    .returning({ id: products.id });
+  if (created) return created.id;
+
+  // Lost an insert race — re-read.
+  const row = await db
+    .select({ id: products.id })
+    .from(products)
+    .where(
+      and(eq(products.workspaceId, workspaceId), eq(products.key, DEFAULT_PRODUCT_KEY)),
+    )
+    .limit(1);
+  if (!row[0]) throw new Error("Failed to ensure the default product.");
+  return row[0].id;
 }
 
 export async function getMembership(
@@ -186,6 +231,9 @@ export async function createWorkspaceWithOwner(
     .onConflictDoNothing({
       target: [workspaceLevels.workspaceId, workspaceLevels.key],
     });
+
+  // Seed the default product (every spec/item lands here until moved).
+  await ensureDefaultProduct(db, workspace.id);
 
   return workspace;
 }

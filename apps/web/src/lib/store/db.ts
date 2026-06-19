@@ -1,9 +1,12 @@
 import { randomUUID } from "node:crypto";
 
 import {
+  canReadProduct,
+  DEFAULT_PRODUCT_KEY,
   extractSections,
   isLeafLevel,
   isValidParentLevel,
+  productKeyFromName,
   resolveLevels,
   resolveLevelUpdate,
   rollUpEstimates,
@@ -13,6 +16,7 @@ import {
   and,
   asc,
   boardPreferences,
+  count,
   createDb,
   desc,
   eq,
@@ -20,7 +24,10 @@ import {
   featureLinks,
   features,
   inArray,
+  members,
   or,
+  productMembers,
+  products,
   savedViews,
   sql,
   specIndex,
@@ -32,9 +39,11 @@ import {
 import {
   FeatureError,
   LevelError,
+  ProductError,
   RelationError,
   type BoardPreferences,
   type CreateFeatureInput,
+  type CreateProductInput,
   type LevelUpdate,
   type CustomFieldValue,
   type FeatureDetail,
@@ -45,6 +54,11 @@ import {
   type GithubLink,
   type GithubLinkAggregate,
   type GithubLinkKind,
+  type ProductAccess,
+  type ProductMemberInput,
+  type ProductMemberRecord,
+  type ProductPatch,
+  type ProductRecord,
   type RelationDirection,
   type RelationInput,
   type ResolvedGithubLink,
@@ -216,6 +230,7 @@ export class DbStore implements FeatureStore {
         title: row.title,
         level: row.level,
         isDbNative: row.repoId === null,
+        productId: row.productId,
         status: row.status,
         priority: row.priority,
         estimate: row.estimate,
@@ -409,6 +424,7 @@ export class DbStore implements FeatureStore {
         title: row.title,
         level: row.level,
         isDbNative: row.repoId === null,
+        productId: row.productId,
         status: row.status,
         priority: row.priority,
         estimate: row.estimate,
@@ -562,6 +578,12 @@ export class DbStore implements FeatureStore {
         throw new FeatureError(`A ${input.level} requires a parent.`);
       }
 
+      // Owning product: the requested one (must belong to this workspace), else
+      // the workspace's default product.
+      const productId = input.productId
+        ? await this.requireProductId(tx, ws, input.productId)
+        : await this.defaultProductId(tx, ws);
+
       // DB-native items have no repo/spec; spec_id mirrors the row id so every
       // row stays uniformly routable by specId.
       const id = randomUUID();
@@ -571,6 +593,7 @@ export class DbStore implements FeatureStore {
           id,
           workspaceId: ws,
           repoId: null,
+          productId,
           specId: id,
           level: input.level,
           title,
@@ -590,6 +613,7 @@ export class DbStore implements FeatureStore {
         title: row.title,
         level: row.level,
         isDbNative: true,
+        productId: row.productId,
         status: row.status,
         priority: row.priority,
         estimate: row.estimate,
@@ -915,6 +939,298 @@ export class DbStore implements FeatureStore {
             updatedAt: new Date(),
           },
         });
+    });
+  }
+
+  // ── Products ────────────────────────────────────────────────────────────
+
+  /** The workspace's default product id, creating it if it's somehow missing. */
+  private async defaultProductId(tx: Tx, ws: string): Promise<string> {
+    const existing = await tx
+      .select({ id: products.id })
+      .from(products)
+      .where(and(eq(products.workspaceId, ws), eq(products.key, DEFAULT_PRODUCT_KEY)))
+      .limit(1);
+    if (existing[0]) return existing[0].id;
+    const [created] = await tx
+      .insert(products)
+      .values({ workspaceId: ws, key: DEFAULT_PRODUCT_KEY, name: "General", position: 0 })
+      .onConflictDoNothing({ target: [products.workspaceId, products.key] })
+      .returning({ id: products.id });
+    if (created) return created.id;
+    // Lost an insert race — re-read.
+    const row = await tx
+      .select({ id: products.id })
+      .from(products)
+      .where(and(eq(products.workspaceId, ws), eq(products.key, DEFAULT_PRODUCT_KEY)))
+      .limit(1);
+    if (!row[0]) throw new ProductError("Could not resolve the default product.");
+    return row[0].id;
+  }
+
+  /** Verify a product id belongs to the workspace, returning it. */
+  private async requireProductId(tx: Tx, ws: string, productId: string): Promise<string> {
+    const row = await tx
+      .select({ id: products.id })
+      .from(products)
+      .where(and(eq(products.id, productId), eq(products.workspaceId, ws)))
+      .limit(1);
+    if (!row[0]) throw new ProductError(`Unknown product: ${productId}`);
+    return row[0].id;
+  }
+
+  async getProductAccess(scope?: WorkspaceScope): Promise<ProductAccess> {
+    return this.scoped(scope, (tx) => this.accessIn(tx, scope!));
+  }
+
+  /** Build the acting user's product access (org-admin flag + per-product roles). */
+  private async accessIn(tx: Tx, scope: WorkspaceScope): Promise<ProductAccess> {
+    const membership = await tx
+      .select({ role: members.role })
+      .from(members)
+      .where(
+        and(eq(members.workspaceId, scope.workspaceId), eq(members.userId, scope.userId)),
+      )
+      .limit(1);
+    const mine = await tx
+      .select({ productId: productMembers.productId, role: productMembers.role })
+      .from(productMembers)
+      .where(
+        and(
+          eq(productMembers.workspaceId, scope.workspaceId),
+          eq(productMembers.userId, scope.userId),
+        ),
+      );
+    const roles = new Map(mine.map((g) => [g.productId, g.role] as const));
+    return { isOrgAdmin: membership[0]?.role === "admin", roles };
+  }
+
+  /** Item counts per product across the workspace. */
+  private async itemCounts(tx: Tx, ws: string): Promise<Map<string, number>> {
+    const rows = await tx
+      .select({ productId: features.productId, n: count() })
+      .from(features)
+      .where(eq(features.workspaceId, ws))
+      .groupBy(features.productId);
+    const out = new Map<string, number>();
+    for (const r of rows) if (r.productId) out.set(r.productId, Number(r.n));
+    return out;
+  }
+
+  async listProducts(scope?: WorkspaceScope): Promise<ProductRecord[]> {
+    return this.scoped(scope, async (tx) => {
+      const ws = scope!.workspaceId;
+      const [rows, counts, access] = await Promise.all([
+        tx
+          .select()
+          .from(products)
+          .where(eq(products.workspaceId, ws))
+          .orderBy(asc(products.position), asc(products.name)),
+        this.itemCounts(tx, ws),
+        this.accessIn(tx, scope!),
+      ]);
+      return rows
+        .filter((p) => canReadProduct(access, p))
+        .map((p) => ({
+          id: p.id,
+          key: p.key,
+          name: p.name,
+          description: p.description,
+          visibility: p.visibility,
+          position: p.position,
+          itemCount: counts.get(p.id) ?? 0,
+          viewerRole: access.roles.get(p.id) ?? null,
+        }));
+    });
+  }
+
+  async getProduct(
+    key: string,
+    scope?: WorkspaceScope,
+  ): Promise<ProductRecord | null> {
+    return this.scoped(scope, async (tx) => {
+      const ws = scope!.workspaceId;
+      const row = await tx.query.products.findFirst({
+        where: and(eq(products.workspaceId, ws), eq(products.key, key)),
+      });
+      if (!row) return null;
+      const access = await this.accessIn(tx, scope!);
+      if (!canReadProduct(access, row)) return null;
+      const counts = await this.itemCounts(tx, ws);
+      return {
+        id: row.id,
+        key: row.key,
+        name: row.name,
+        description: row.description,
+        visibility: row.visibility,
+        position: row.position,
+        itemCount: counts.get(row.id) ?? 0,
+        viewerRole: access.roles.get(row.id) ?? null,
+      };
+    });
+  }
+
+  async createProduct(
+    input: CreateProductInput,
+    scope?: WorkspaceScope,
+  ): Promise<ProductRecord> {
+    return this.scoped(scope, async (tx) => {
+      const ws = scope!.workspaceId;
+      const name = input.name.trim();
+      if (!name) throw new ProductError("Product name is required.");
+      const taken = new Set(
+        (
+          await tx
+            .select({ key: products.key })
+            .from(products)
+            .where(eq(products.workspaceId, ws))
+        ).map((r) => r.key),
+      );
+      const key = productKeyFromName(name, taken);
+      const max = await tx
+        .select({ m: sql<number>`coalesce(max(${products.position}), -1)` })
+        .from(products)
+        .where(eq(products.workspaceId, ws));
+      const [row] = await tx
+        .insert(products)
+        .values({
+          workspaceId: ws,
+          key,
+          name,
+          description: input.description ?? null,
+          visibility: input.visibility ?? "org",
+          position: Number(max[0]?.m ?? -1) + 1,
+        })
+        .returning();
+      if (!row) throw new ProductError("Failed to create product.");
+      return {
+        id: row.id,
+        key: row.key,
+        name: row.name,
+        description: row.description,
+        visibility: row.visibility,
+        position: row.position,
+        itemCount: 0,
+        viewerRole: null,
+      };
+    });
+  }
+
+  async updateProduct(
+    id: string,
+    patch: ProductPatch,
+    scope?: WorkspaceScope,
+  ): Promise<ProductRecord> {
+    return this.scoped(scope, async (tx) => {
+      const ws = scope!.workspaceId;
+      const set: Record<string, unknown> = { updatedAt: new Date() };
+      if (patch.name !== undefined) {
+        const name = patch.name.trim();
+        if (!name) throw new ProductError("Product name is required.");
+        set.name = name;
+      }
+      if (patch.description !== undefined) set.description = patch.description;
+      if (patch.visibility !== undefined) set.visibility = patch.visibility;
+      if (patch.position !== undefined) set.position = patch.position;
+      const [row] = await tx
+        .update(products)
+        .set(set)
+        .where(and(eq(products.id, id), eq(products.workspaceId, ws)))
+        .returning();
+      if (!row) throw new ProductError(`Unknown product: ${id}`);
+      const counts = await this.itemCounts(tx, ws);
+      const access = await this.accessIn(tx, scope!);
+      return {
+        id: row.id,
+        key: row.key,
+        name: row.name,
+        description: row.description,
+        visibility: row.visibility,
+        position: row.position,
+        itemCount: counts.get(row.id) ?? 0,
+        viewerRole: access.roles.get(row.id) ?? null,
+      };
+    });
+  }
+
+  async deleteProduct(id: string, scope?: WorkspaceScope): Promise<void> {
+    await this.scoped(scope, async (tx) => {
+      const ws = scope!.workspaceId;
+      const used = await tx
+        .select({ n: count() })
+        .from(features)
+        .where(and(eq(features.workspaceId, ws), eq(features.productId, id)));
+      if (Number(used[0]?.n ?? 0) > 0) {
+        throw new ProductError(
+          "Can't delete a product while it still has work items.",
+        );
+      }
+      const deleted = await tx
+        .delete(products)
+        .where(and(eq(products.id, id), eq(products.workspaceId, ws)))
+        .returning({ id: products.id });
+      if (!deleted[0]) throw new ProductError(`Unknown product: ${id}`);
+    });
+  }
+
+  async listProductMembers(
+    productId: string,
+    scope?: WorkspaceScope,
+  ): Promise<ProductMemberRecord[]> {
+    return this.scoped(scope, async (tx) => {
+      const rows = await tx
+        .select({
+          userId: productMembers.userId,
+          name: users.name,
+          email: users.email,
+          role: productMembers.role,
+        })
+        .from(productMembers)
+        .innerJoin(users, eq(users.id, productMembers.userId))
+        .where(
+          and(
+            eq(productMembers.workspaceId, scope!.workspaceId),
+            eq(productMembers.productId, productId),
+          ),
+        )
+        .orderBy(asc(users.name));
+      return rows;
+    });
+  }
+
+  async setProductMember(
+    productId: string,
+    input: ProductMemberInput,
+    scope?: WorkspaceScope,
+  ): Promise<void> {
+    await this.scoped(scope, async (tx) => {
+      const ws = scope!.workspaceId;
+      await this.requireProductId(tx, ws, productId);
+      await tx
+        .insert(productMembers)
+        .values({ workspaceId: ws, productId, userId: input.userId, role: input.role })
+        .onConflictDoUpdate({
+          target: [productMembers.productId, productMembers.userId],
+          set: { role: input.role },
+        });
+    });
+  }
+
+  async removeProductMember(
+    productId: string,
+    userId: string,
+    scope?: WorkspaceScope,
+  ): Promise<void> {
+    await this.scoped(scope, async (tx) => {
+      await tx
+        .delete(productMembers)
+        .where(
+          and(
+            eq(productMembers.workspaceId, scope!.workspaceId),
+            eq(productMembers.productId, productId),
+            eq(productMembers.userId, userId),
+          ),
+        );
     });
   }
 }

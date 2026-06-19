@@ -3,10 +3,13 @@ import { promises as fs } from "node:fs";
 import path from "node:path";
 
 import {
+  DEFAULT_PRODUCT_KEY,
   isLeafLevel,
   isValidParentLevel,
   leafLevel,
+  LOCAL_PRODUCT_ACCESS,
   parseSpec,
+  productKeyFromName,
   resolveLevels,
   resolveLevelUpdate,
   rollUpEstimates,
@@ -16,9 +19,11 @@ import {
 import {
   FeatureError,
   LevelError,
+  ProductError,
   RelationError,
   type BoardPreferences,
   type CreateFeatureInput,
+  type CreateProductInput,
   type LevelUpdate,
   type CustomFieldValue,
   type FeatureDetail,
@@ -27,6 +32,11 @@ import {
   type FeatureRelation,
   type FeatureStore,
   type GithubLinkAggregate,
+  type ProductAccess,
+  type ProductMemberInput,
+  type ProductMemberRecord,
+  type ProductPatch,
+  type ProductRecord,
   type ResolvedGithubLink,
   type RelationDirection,
   type RelationInput,
@@ -48,7 +58,29 @@ interface LocalItem {
   roadmapQuarter: string | null;
   tags: string[];
   parentSpecId: string | null;
+  /** Owning product id; defaults to the default product when absent. */
+  productId?: string | null;
 }
+
+/** A product (sibling backlog) persisted in local file mode. */
+interface LocalProduct {
+  id: string;
+  key: string;
+  name: string;
+  description: string | null;
+  visibility: "org" | "private";
+  position: number;
+}
+
+/** The default product seeded when none is persisted (id is stable). */
+const LOCAL_DEFAULT_PRODUCT: LocalProduct = {
+  id: "default",
+  key: DEFAULT_PRODUCT_KEY,
+  name: "General",
+  description: null,
+  visibility: "org",
+  position: 0,
+};
 
 /** Zero GitHub-link aggregate; file mode has no GitHub connection. */
 function emptyGithubSummary(): GithubLinkAggregate {
@@ -76,6 +108,8 @@ interface LocalMetadata {
   links?: LocalLink[];
   /** Parent feature (epic) spec id, or null when top-level. */
   parentSpecId?: string | null;
+  /** Owning product id; defaults to the default product when absent. */
+  productId?: string | null;
 }
 
 /** The terminal status used for hierarchy roll-up progress. */
@@ -158,6 +192,42 @@ export class LocalFileStore implements FeatureStore {
     return path.join(this.root, ".specboard", "local-levels.json");
   }
 
+  private get productsPath() {
+    return path.join(this.root, ".specboard", "local-products.json");
+  }
+
+  /** Persisted products, seeded with the default product when none exist. */
+  private async readProducts(): Promise<LocalProduct[]> {
+    try {
+      const rows = JSON.parse(
+        await fs.readFile(this.productsPath, "utf8"),
+      ) as LocalProduct[];
+      if (rows.length > 0) return rows;
+    } catch {
+      /* fall through to the seed */
+    }
+    return [{ ...LOCAL_DEFAULT_PRODUCT }];
+  }
+
+  private async writeProducts(rows: LocalProduct[]): Promise<void> {
+    await fs.mkdir(path.dirname(this.productsPath), { recursive: true });
+    await fs.writeFile(
+      this.productsPath,
+      JSON.stringify(rows, null, 2) + "\n",
+      "utf8",
+    );
+  }
+
+  /** The default product id (the seeded "default", or the first product). */
+  private async defaultProductId(): Promise<string> {
+    const products = await this.readProducts();
+    return (
+      products.find((p) => p.key === DEFAULT_PRODUCT_KEY)?.id ??
+      products[0]?.id ??
+      LOCAL_DEFAULT_PRODUCT.id
+    );
+  }
+
   /** The configured hierarchy levels, or null when none are persisted. */
   private async readLevels(): Promise<WorkspaceLevel[] | null> {
     try {
@@ -232,11 +302,12 @@ export class LocalFileStore implements FeatureStore {
   }
 
   private async loadAll(): Promise<FeatureDetail[]> {
-    const [files, meta, items, levels] = await Promise.all([
+    const [files, meta, items, levels, defaultProductId] = await Promise.all([
       this.walkSpecFiles(this.specsDir),
       this.readMetadata(),
       this.readItems(),
       this.readLevels(),
+      this.defaultProductId(),
     ]);
     const leafKey = leafLevel(levels).key;
     const features: FeatureDetail[] = [];
@@ -255,6 +326,7 @@ export class LocalFileStore implements FeatureStore {
         kind: parsed.frontmatter.kind,
         level: leafKey,
         isDbNative: false,
+        productId: m.productId ?? defaultProductId,
         status: m.status ?? "backlog",
         priority: m.priority ?? null,
         estimate: m.estimate ?? null,
@@ -288,6 +360,7 @@ export class LocalFileStore implements FeatureStore {
         title: item.title,
         level: item.level,
         isDbNative: true,
+        productId: item.productId ?? defaultProductId,
         status: item.status,
         priority: item.priority,
         estimate: item.estimate,
@@ -469,6 +542,7 @@ export class LocalFileStore implements FeatureStore {
     }
 
     const id = randomUUID();
+    const productId = input.productId ?? (await this.defaultProductId());
     const item: LocalItem = {
       id,
       title,
@@ -480,6 +554,7 @@ export class LocalFileStore implements FeatureStore {
       roadmapQuarter: input.roadmapQuarter ?? null,
       tags: input.tags ?? [],
       parentSpecId: input.parentSpecId ?? null,
+      productId,
     };
     const items = await this.readItems();
     await this.writeItems([...items, item]);
@@ -489,6 +564,7 @@ export class LocalFileStore implements FeatureStore {
       title,
       level: item.level,
       isDbNative: true,
+      productId,
       status: item.status,
       priority: item.priority,
       estimate: item.estimate,
@@ -665,6 +741,138 @@ export class LocalFileStore implements FeatureStore {
       JSON.stringify(prefs, null, 2) + "\n",
       "utf8",
     );
+  }
+
+  // Products. Local file mode is a single all-powerful user (see core
+  // LOCAL_PRODUCT_ACCESS), so visibility/permissions aren't enforced; products
+  // persist to `.specboard/local-products.json` for switcher parity.
+  async getProductAccess(_scope?: WorkspaceScope): Promise<ProductAccess> {
+    return LOCAL_PRODUCT_ACCESS;
+  }
+
+  /** Item counts per product, derived from all features (specs + items). */
+  private async productItemCounts(): Promise<Map<string, number>> {
+    const features = await this.loadAll();
+    const out = new Map<string, number>();
+    for (const f of features) {
+      if (f.productId) out.set(f.productId, (out.get(f.productId) ?? 0) + 1);
+    }
+    return out;
+  }
+
+  private toProductRecord(
+    p: LocalProduct,
+    counts: Map<string, number>,
+  ): ProductRecord {
+    return {
+      id: p.id,
+      key: p.key,
+      name: p.name,
+      description: p.description,
+      visibility: p.visibility,
+      position: p.position,
+      itemCount: counts.get(p.id) ?? 0,
+      viewerRole: null,
+    };
+  }
+
+  async listProducts(_scope?: WorkspaceScope): Promise<ProductRecord[]> {
+    const [products, counts] = await Promise.all([
+      this.readProducts(),
+      this.productItemCounts(),
+    ]);
+    return products
+      .sort((a, b) => a.position - b.position || a.name.localeCompare(b.name))
+      .map((p) => this.toProductRecord(p, counts));
+  }
+
+  async getProduct(
+    key: string,
+    _scope?: WorkspaceScope,
+  ): Promise<ProductRecord | null> {
+    const products = await this.readProducts();
+    const p = products.find((x) => x.key === key);
+    if (!p) return null;
+    return this.toProductRecord(p, await this.productItemCounts());
+  }
+
+  async createProduct(
+    input: CreateProductInput,
+    _scope?: WorkspaceScope,
+  ): Promise<ProductRecord> {
+    const name = input.name.trim();
+    if (!name) throw new ProductError("Product name is required.");
+    const products = await this.readProducts();
+    const key = productKeyFromName(name, new Set(products.map((p) => p.key)));
+    const product: LocalProduct = {
+      id: randomUUID(),
+      key,
+      name,
+      description: input.description ?? null,
+      visibility: input.visibility ?? "org",
+      position: products.reduce((m, p) => Math.max(m, p.position), -1) + 1,
+    };
+    await this.writeProducts([...products, product]);
+    return this.toProductRecord(product, new Map());
+  }
+
+  async updateProduct(
+    id: string,
+    patch: ProductPatch,
+    _scope?: WorkspaceScope,
+  ): Promise<ProductRecord> {
+    const products = await this.readProducts();
+    const p = products.find((x) => x.id === id);
+    if (!p) throw new ProductError(`Unknown product: ${id}`);
+    if (patch.name !== undefined) {
+      const name = patch.name.trim();
+      if (!name) throw new ProductError("Product name is required.");
+      p.name = name;
+    }
+    if (patch.description !== undefined) p.description = patch.description;
+    if (patch.visibility !== undefined) p.visibility = patch.visibility;
+    if (patch.position !== undefined) p.position = patch.position;
+    await this.writeProducts(products);
+    return this.toProductRecord(p, await this.productItemCounts());
+  }
+
+  async deleteProduct(id: string, _scope?: WorkspaceScope): Promise<void> {
+    const counts = await this.productItemCounts();
+    if ((counts.get(id) ?? 0) > 0) {
+      throw new ProductError(
+        "Can't delete a product while it still has work items.",
+      );
+    }
+    const products = await this.readProducts();
+    if (!products.some((p) => p.id === id))
+      throw new ProductError(`Unknown product: ${id}`);
+    await this.writeProducts(products.filter((p) => p.id !== id));
+  }
+
+  // Membership needs real user records, which file mode doesn't have.
+  async listProductMembers(
+    _productId: string,
+    _scope?: WorkspaceScope,
+  ): Promise<ProductMemberRecord[]> {
+    return [];
+  }
+
+  async setProductMember(
+    _productId: string,
+    _input: ProductMemberInput,
+    _scope?: WorkspaceScope,
+  ): Promise<void> {
+    throw new ProductError(
+      "Managing product members requires authentication (not available in local file mode).",
+    );
+  }
+
+  async removeProductMember(
+    _productId: string,
+    _userId: string,
+    _scope?: WorkspaceScope,
+  ): Promise<void> {
+    // Nothing to remove in file mode.
   }
 }
 

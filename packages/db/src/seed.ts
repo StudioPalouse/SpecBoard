@@ -12,11 +12,12 @@ import { fileURLToPath } from "node:url";
 
 import { eq } from "drizzle-orm";
 
-import { DEFAULT_LEVELS, parseSpec } from "@specboard/core";
+import { DEFAULT_LEVELS, DEFAULT_PRODUCT_KEY, parseSpec } from "@specboard/core";
 
 import { createDb } from "./client.js";
 import {
   features,
+  products,
   repositories,
   specIndex,
   workspaceLevels,
@@ -97,6 +98,16 @@ await db
     target: [workspaceLevels.workspaceId, workspaceLevels.key],
   });
 
+// Seed the default product so feature inserts have somewhere to land.
+const [product] = await db
+  .insert(products)
+  .values({ workspaceId: workspace!.id, key: DEFAULT_PRODUCT_KEY, name: "Local", position: 0 })
+  .onConflictDoUpdate({
+    target: [products.workspaceId, products.key],
+    set: { name: "Local" },
+  })
+  .returning();
+
 const [repository] = await db
   .insert(repositories)
   .values({
@@ -128,6 +139,7 @@ for (const file of files) {
     .values({
       workspaceId: workspace!.id,
       repoId: repository!.id,
+      productId: product!.id,
       specId: parsed.frontmatter.id,
       title: parsed.frontmatter.title,
       status: meta.status ?? "backlog",
