@@ -1,14 +1,15 @@
+import { notFound } from "next/navigation";
+
 import { parentLevelKey, resolveEstimateConfig, resolveWorkflow } from "@specboard/core";
 
-import { BoardClient } from "@/app/board/board-client";
+import { BoardClient } from "./board-client";
 import { CardFieldsMenu } from "@/components/card-fields-menu";
 import { EmptyState } from "@/components/empty-state";
 import { LevelSwitcher } from "@/components/level-switcher";
-import { ProductSwitcher } from "@/components/product-switcher";
 import { WorkItemCreate } from "@/components/work-item-create";
 import { WorkViewTabs } from "@/components/work-view-tabs";
 import { resolveActiveLevel } from "@/lib/active-level";
-import { resolveActiveProduct } from "@/lib/active-product";
+import { ALL_PRODUCTS, resolveActiveProduct } from "@/lib/active-product";
 import { getBoardPreferences } from "@/lib/board-preferences-service";
 import { cardFieldCatalog, resolveCardFields } from "@/lib/card-fields";
 import { getDb } from "@/lib/db";
@@ -21,8 +22,10 @@ export const dynamic = "force-dynamic";
 
 /** Kanban board: drag cards to reorder / change status, click to edit inline. */
 export default async function BoardPage({
+  params,
   searchParams,
 }: {
+  params: Promise<{ org: string; product: string }>;
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const access = await requireWorkspaceAccess();
@@ -34,20 +37,22 @@ export default async function BoardPage({
   const customFields = repoConfig?.fields ?? [];
   const columns = workflow.statuses.filter((s) => s !== "archived");
 
-  const params = await searchParams;
+  const { product: productSlug } = await params;
+  const sp = await searchParams;
   const store = await getStore();
   const allFeatures = await store.listFeatures(access ?? undefined);
 
-  // The board scopes to one product at a time (default: all products) and shows
-  // one hierarchy level at a time (default: the leaf/specs).
+  // The board scopes to the product in the URL (`all` = every product) and
+  // shows one hierarchy level at a time (default: the leaf/specs).
   const products = await store.listProducts(access ?? undefined);
-  const activeProduct = resolveActiveProduct(products, params.product);
+  const activeProduct = resolveActiveProduct(products, productSlug);
+  if (productSlug !== ALL_PRODUCTS && !activeProduct) notFound();
   const scoped = activeProduct
     ? allFeatures.filter((f) => f.productId === activeProduct.id)
     : allFeatures;
 
   const levels = await store.listLevels(access ?? undefined);
-  const activeLevel = resolveActiveLevel(levels, params.level);
+  const activeLevel = resolveActiveLevel(levels, sp.level);
   const features = scoped.filter((f) => f.level === activeLevel.key);
   const parentKey = parentLevelKey(activeLevel.key, levels);
   const parents = parentKey
@@ -75,7 +80,6 @@ export default async function BoardPage({
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex flex-wrap items-center gap-2">
           <WorkViewTabs />
-          <ProductSwitcher products={products} active={activeProduct?.key ?? "all"} />
           <LevelSwitcher levels={levels} active={activeLevel.key} />
         </div>
         <div className="flex items-center gap-2">

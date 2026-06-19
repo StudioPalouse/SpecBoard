@@ -3,6 +3,7 @@ import { Toaster } from "sonner";
 
 import { AppSidebar } from "@/components/app-sidebar";
 import { ThemeProvider } from "@/components/theme-provider";
+import { listSidebarOrgs, listSidebarProducts } from "@/lib/workspace-access";
 
 import "./globals.css";
 
@@ -11,13 +12,17 @@ export const metadata = {
   description: "Spec-based product management over git-native specs.",
 };
 
-export default function RootLayout({ children }: { children: ReactNode }) {
+export default async function RootLayout({ children }: { children: ReactNode }) {
+  const [orgs, products] = await Promise.all([
+    listSidebarOrgs(),
+    listSidebarProducts(),
+  ]);
   return (
     <html lang="en" suppressHydrationWarning>
       <body className="min-h-screen antialiased">
         <ThemeProvider>
           <div className="flex min-h-screen">
-            <AppSidebar />
+            <AppSidebar orgs={orgs} products={products} />
             <main className="min-w-0 flex-1">
               <div className="mx-auto max-w-6xl px-6 py-8">{children}</div>
             </main>

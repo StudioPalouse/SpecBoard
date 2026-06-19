@@ -11,6 +11,9 @@ import {
 } from "@specboard/db";
 import { DEFAULT_LEVELS, DEFAULT_PRODUCT_KEY } from "@specboard/core";
 
+import { LOCAL_ORG_SLUG } from "@/lib/org-path";
+import { isMultiTenant } from "@/lib/tenancy";
+
 export type Workspace = typeof workspaces.$inferSelect;
 export type Member = typeof members.$inferSelect;
 export type MemberRole = Member["role"];
@@ -155,9 +158,62 @@ export async function getMembership(
 }
 
 /**
- * Ensure `userId` belongs to the active workspace. Idempotent: returns the
- * existing membership if any, otherwise joins them as a `viewer`. Returns
+ * Every workspace `userId` belongs to. The basis for the org switcher and for
+ * multi-org membership; single-tenant deployments simply return ≤1 row.
+ */
+export async function listMembershipsForUser(
+  db: Database,
+  userId: string,
+): Promise<Member[]> {
+  return db.select().from(members).where(eq(members.userId, userId));
+}
+
+/** The caller's membership in one specific workspace, or null when not a member. */
+export async function getMembershipFor(
+  db: Database,
+  userId: string,
+  workspaceId: string,
+): Promise<Member | null> {
+  const rows = await db
+    .select()
+    .from(members)
+    .where(and(eq(members.userId, userId), eq(members.workspaceId, workspaceId)))
+    .limit(1);
+  return rows[0] ?? null;
+}
+
+/** A workspace's URL slug by id, falling back to the local slug when missing. */
+export async function workspaceSlug(
+  db: Database,
+  workspaceId: string,
+): Promise<string> {
+  const workspace = await getWorkspaceById(db, workspaceId);
+  return workspace?.slug ?? LOCAL_ORG_SLUG;
+}
+
+/** Look up a workspace by its URL slug, or null when no such org exists. */
+export async function getWorkspaceBySlug(
+  db: Database,
+  slug: string,
+): Promise<Workspace | null> {
+  const rows = await db
+    .select()
+    .from(workspaces)
+    .where(eq(workspaces.slug, slug))
+    .limit(1);
+  return rows[0] ?? null;
+}
+
+/**
+ * Ensure `userId` belongs to the single active workspace, auto-joining them as
+ * a `viewer`. This is the **single-tenant** convenience: when a deployment
+ * serves one org, every authenticated user belongs to it. Idempotent; returns
  * `null` when no workspace exists yet — the caller routes the user to /setup.
+ *
+ * Auto-join is intentionally NOT offered for a specific workspace: in
+ * multi-tenant mode, joining an org is explicit (invite), so callers there go
+ * through {@link resolveActiveWorkspace}, which only returns an *existing*
+ * membership.
  */
 export async function ensureMembership(
   db: Database,
@@ -176,6 +232,38 @@ export async function ensureMembership(
 
   // Re-read so a row inserted here or by a concurrent request is returned.
   return getMembership(db, userId);
+}
+
+/**
+ * Resolve the caller's **active workspace membership** — the single seam that
+ * replaces the old "first workspace" assumption (ADR 0001, D2).
+ *
+ * - **Multi-tenant + an `orgSlug`** (from the URL path, ADR 0001 D3): the org
+ *   is looked up by slug and membership is *required* — no auto-join. Returns
+ *   `null` when the org is unknown or the caller isn't a member, so the caller
+ *   can 404/redirect. This is the IDOR-safe path: the URL is only a hint, and
+ *   authority comes from a validated membership.
+ * - **Single-tenant (or no slug yet)**: the one workspace, auto-joined as
+ *   viewer via {@link ensureMembership} — byte-for-byte the current behavior.
+ */
+export async function resolveActiveWorkspace(
+  db: Database,
+  userId: string,
+  opts: { orgSlug?: string | null } = {},
+): Promise<Member | null> {
+  if (isMultiTenant() && opts.orgSlug) {
+    const workspace = await getWorkspaceBySlug(db, opts.orgSlug);
+    if (!workspace) return null;
+    return getMembershipFor(db, userId, workspace.id);
+  }
+  // Single-tenant: the one workspace, auto-joined. If the URL carries a slug it
+  // must match — otherwise the URL is lying about which org you're in.
+  const membership = await ensureMembership(db, userId);
+  if (membership && opts.orgSlug) {
+    const workspace = await getActiveWorkspace(db);
+    if (workspace && workspace.slug !== opts.orgSlug) return null;
+  }
+  return membership;
 }
 
 const SLUG_MAX = 48;

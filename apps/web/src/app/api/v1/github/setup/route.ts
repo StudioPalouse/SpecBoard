@@ -7,7 +7,8 @@ import {
   INSTALL_COOKIE_MAX_AGE,
   makeInstallCookieValue,
 } from "@/lib/github-install";
-import { getMembership } from "@/lib/workspace";
+import { orgPath } from "@/lib/org-path";
+import { getMembership, workspaceSlug } from "@/lib/workspace";
 
 export const dynamic = "force-dynamic";
 
@@ -40,8 +41,11 @@ export async function GET(req: Request) {
   }
 
   const membership = await getMembership(db, user.id);
-  if (!membership || membership.role !== "admin" || !installationId) {
-    return redirectTo("/settings/repositories?error=install");
+  if (!membership) return redirectTo("/");
+  const slug = await workspaceSlug(db, membership.workspaceId);
+  const repos = (q = "") => orgPath(slug, `/settings/repositories${q}`);
+  if (membership.role !== "admin" || !installationId) {
+    return redirectTo(repos("?error=install"));
   }
 
   // Remember the installation for this admin so the picker can list its repos
@@ -55,5 +59,5 @@ export async function GET(req: Request) {
     maxAge: INSTALL_COOKIE_MAX_AGE,
   });
 
-  return redirectTo("/settings/repositories?connected=1");
+  return redirectTo(repos("?connected=1"));
 }

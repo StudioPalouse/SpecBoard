@@ -25,8 +25,8 @@ export async function DELETE(req: Request, { params }: Params) {
       decodeURIComponent(linkId),
       authz.scope ?? undefined,
     );
-    for (const path of ["/backlog", "/board", "/roadmap"]) revalidatePath(path);
-    revalidatePath("/feature/[id]", "page");
+    for (const path of ["/[org]/[product]/backlog", "/[org]/[product]/board", "/[org]/[product]/roadmap"]) revalidatePath(path, "page");
+    revalidatePath("/[org]/feature/[id]", "page");
     return Response.json({ relations });
   } catch (err) {
     if (err instanceof FeatureNotFoundError) {

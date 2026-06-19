@@ -7,7 +7,8 @@ import {
   appOriginFromRequest,
   newSetupNonce,
 } from "@/lib/github-install";
-import { getMembership } from "@/lib/workspace";
+import { orgPath } from "@/lib/org-path";
+import { getMembership, workspaceSlug } from "@/lib/workspace";
 
 export const dynamic = "force-dynamic";
 
@@ -39,13 +40,16 @@ export async function GET(req: Request) {
   }
 
   const membership = await getMembership(db, user.id);
-  if (!membership || membership.role !== "admin") {
-    return htmlRedirect("/settings/repositories?error=forbidden");
+  if (!membership) return htmlRedirect("/");
+  const slug = await workspaceSlug(db, membership.workspaceId);
+  const repos = (q = "") => orgPath(slug, `/settings/repositories${q}`);
+  if (membership.role !== "admin") {
+    return htmlRedirect(repos("?error=forbidden"));
   }
 
   const org = new URL(req.url).searchParams.get("org")?.trim() ?? "";
   if (org && !isValidOwner(org)) {
-    return htmlRedirect("/settings/repositories?error=org");
+    return htmlRedirect(repos("?error=org"));
   }
 
   const origin = appOriginFromRequest(req);

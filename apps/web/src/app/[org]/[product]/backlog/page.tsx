@@ -1,5 +1,8 @@
+import { notFound } from "next/navigation";
+
 import { EmptyState } from "@/components/empty-state";
 import { WorkViewTabs } from "@/components/work-view-tabs";
+import { ALL_PRODUCTS, resolveActiveProduct } from "@/lib/active-product";
 import { getDb } from "@/lib/db";
 import {
   applyFeatureFilters,
@@ -23,8 +26,10 @@ export const dynamic = "force-dynamic";
  * narrows the list; the active filters live in the URL query string.
  */
 export default async function BacklogPage({
+  params,
   searchParams,
 }: {
+  params: Promise<{ org: string; product: string }>;
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const access = await requireWorkspaceAccess();
@@ -32,9 +37,16 @@ export default async function BacklogPage({
   const workflow = await resolveWorkflowFor(access);
   const filters = parseFeatureFilters(await searchParams);
   const store = await getStore();
-  const features = sortFeatures(await store.listFeatures(access ?? undefined)).filter(
-    (f) => f.status !== "archived",
-  );
+
+  // Scope to the product in the URL (`all` = every product).
+  const { product: productSlug } = await params;
+  const products = await store.listProducts(access ?? undefined);
+  const activeProduct = resolveActiveProduct(products, productSlug);
+  if (productSlug !== ALL_PRODUCTS && !activeProduct) notFound();
+
+  const features = sortFeatures(await store.listFeatures(access ?? undefined))
+    .filter((f) => f.status !== "archived")
+    .filter((f) => !activeProduct || f.productId === activeProduct.id);
 
   // Assignee options come from the workspace roster (DB mode only).
   const db = getDb();

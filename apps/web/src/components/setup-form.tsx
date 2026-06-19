@@ -30,7 +30,8 @@ export function SetupForm() {
       setError(null);
       try {
         await createWorkspace(name, seedSampleData);
-        router.push("/backlog");
+        // Root resolves the just-created org and forwards to /{org}/board.
+        router.push("/");
         router.refresh();
       } catch (err) {
         if (err instanceof AuthRequiredError) {

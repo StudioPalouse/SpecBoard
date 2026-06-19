@@ -51,8 +51,8 @@ export async function POST(req: Request, { params }: Params) {
       parseRelationInput(body),
       authz.scope ?? undefined,
     );
-    for (const path of ["/backlog", "/board", "/roadmap"]) revalidatePath(path);
-    revalidatePath("/feature/[id]", "page");
+    for (const path of ["/[org]/[product]/backlog", "/[org]/[product]/board", "/[org]/[product]/roadmap"]) revalidatePath(path, "page");
+    revalidatePath("/[org]/feature/[id]", "page");
     return Response.json({ relations });
   } catch (err) {
     if (err instanceof FeatureNotFoundError) {

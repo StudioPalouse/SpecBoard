@@ -7,6 +7,7 @@ import { useEffect, useRef, useState, useTransition } from "react";
 
 import { ThemeToggle } from "@/components/theme-toggle";
 import { signOut, useSession } from "@/lib/auth-client";
+import { useOrgPath } from "@/lib/use-org";
 import { cn } from "@/lib/utils";
 
 /**
@@ -18,6 +19,7 @@ import { cn } from "@/lib/utils";
 export function SidebarProfile() {
   const { data, isPending, error } = useSession();
   const router = useRouter();
+  const orgHref = useOrgPath();
   const [open, setOpen] = useState(false);
   const [pending, startTransition] = useTransition();
   const ref = useRef<HTMLDivElement>(null);
@@ -56,7 +58,7 @@ export function SidebarProfile() {
             <ThemeToggle className="w-full justify-center" />
           </div>
           <Link
-            href="/settings"
+            href={orgHref("/settings")}
             onClick={() => setOpen(false)}
             className="flex items-center gap-2 rounded px-2 py-1.5 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
           >

@@ -15,15 +15,16 @@ export const metadata = { title: "Set up · SpecBoard" };
  */
 export default async function SetupPage() {
   const db = getDb();
-  if (!db) redirect("/backlog"); // auth disabled (file mode) — nothing to set up
+  if (!db) redirect("/"); // auth disabled (file mode) — nothing to set up
 
   const user = await getServerSessionUser();
   if (!user) redirect("/sign-in?from=/setup");
 
   // If an org already exists, this user isn't the first — join it and leave.
+  // Root resolves their active org and forwards to /{org}/board.
   if (await getActiveWorkspace(db)) {
     await ensureMembership(db, user.id);
-    redirect("/backlog");
+    redirect("/");
   }
 
   return <SetupForm />;

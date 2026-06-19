@@ -5,6 +5,7 @@ import { useMemo, useState, useTransition } from "react";
 
 import { updateWorkspace } from "@/lib/api-client";
 import { changeEmail, updateUser } from "@/lib/auth-client";
+import { useOrgPath } from "@/lib/use-org";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Button } from "@/components/ui/button";
 import {
@@ -178,6 +179,7 @@ function Avatar({ name, image }: { name: string; image: string | null }) {
 export function EmailCard({ email }: { email: string }) {
   const [pending, startTransition] = useTransition();
   const [status, setStatus] = useState<Status>(null);
+  const orgHref = useOrgPath();
 
   function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -189,7 +191,7 @@ export function EmailCard({ email }: { email: string }) {
     }
     startTransition(async () => {
       setStatus(null);
-      const { error } = await changeEmail({ newEmail, callbackURL: "/settings" });
+      const { error } = await changeEmail({ newEmail, callbackURL: orgHref("/settings") });
       if (error) {
         setStatus({ kind: "error", message: error.message ?? "Couldn't change your email." });
         return;

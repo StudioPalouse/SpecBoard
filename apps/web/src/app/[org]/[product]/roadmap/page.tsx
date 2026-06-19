@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { notFound } from "next/navigation";
 
 import { parentLevelKey } from "@specboard/core";
 
@@ -11,11 +12,11 @@ import {
 } from "@/components/ui/card";
 import { EmptyState } from "@/components/empty-state";
 import { LevelSwitcher } from "@/components/level-switcher";
-import { ProductSwitcher } from "@/components/product-switcher";
 import { StatusDot } from "@/components/status-dot";
 import { WorkItemCreate } from "@/components/work-item-create";
 import { resolveActiveLevel } from "@/lib/active-level";
-import { resolveActiveProduct } from "@/lib/active-product";
+import { ALL_PRODUCTS, resolveActiveProduct } from "@/lib/active-product";
+import { LOCAL_ORG_SLUG, orgPath } from "@/lib/org-path";
 import {
   priorityLabel,
   sortFeatures,
@@ -29,28 +30,33 @@ export const dynamic = "force-dynamic";
 
 /** Roadmap: features grouped by quarter, unscheduled work last. */
 export default async function RoadmapPage({
+  params,
   searchParams,
 }: {
+  params: Promise<{ org: string; product: string }>;
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const access = await requireWorkspaceAccess();
   const canEdit = !access || canWrite(access.role);
-  const params = await searchParams;
+  const org = access?.orgSlug ?? LOCAL_ORG_SLUG;
+  const { product: productSlug } = await params;
+  const sp = await searchParams;
   const store = await getStore();
   const allFeatures = sortFeatures(
     await store.listFeatures(access ?? undefined),
   ).filter((f) => f.status !== "archived");
 
-  // Roadmap scopes to one product at a time (default: all products) and shows
+  // Roadmap scopes to the product in the URL (`all` = every product) and shows
   // one hierarchy level at a time (default: the leaf/specs).
   const products = await store.listProducts(access ?? undefined);
-  const activeProduct = resolveActiveProduct(products, params.product);
+  const activeProduct = resolveActiveProduct(products, productSlug);
+  if (productSlug !== ALL_PRODUCTS && !activeProduct) notFound();
   const scoped = activeProduct
     ? allFeatures.filter((f) => f.productId === activeProduct.id)
     : allFeatures;
 
   const levels = await store.listLevels(access ?? undefined);
-  const activeLevel = resolveActiveLevel(levels, params.level);
+  const activeLevel = resolveActiveLevel(levels, sp.level);
   const features = scoped.filter((f) => f.level === activeLevel.key);
   const parentKey = parentLevelKey(activeLevel.key, levels);
   const parents = parentKey
@@ -75,7 +81,6 @@ export default async function RoadmapPage({
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex flex-wrap items-center gap-3">
           <h1 className="text-lg font-semibold tracking-tight">Roadmap</h1>
-          <ProductSwitcher products={products} active={activeProduct?.key ?? "all"} />
           <LevelSwitcher levels={levels} active={activeLevel.key} />
         </div>
         {canEdit && !activeLevel.isLeaf ? (
@@ -111,7 +116,7 @@ export default async function RoadmapPage({
                   <CardHeader className="space-y-1 p-3">
                     <CardTitle className="text-sm">
                       <Link
-                        href={`/feature/${f.specId}`}
+                        href={orgPath(org, `/feature/${f.specId}`)}
                         className="hover:underline"
                       >
                         {f.title}
