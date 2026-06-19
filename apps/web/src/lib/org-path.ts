@@ -18,6 +18,20 @@ export function orgProductPath(org: string, product: string, path = "/"): string
   return orgPath(org, `/${product}${path === "/" ? "" : path}`);
 }
 
+/**
+ * Canonical permalink for a backlog item: the type segment is the item's level
+ * key, then its specId (ADR 0002). e.g. `/acme/web/backlog/work/{specId}` or
+ * `/acme/web/backlog/epic/{id}`. The bare `/backlog/{specId}` shape still
+ * resolves (it redirects here), so callers without a level can fall back to it.
+ */
+export function itemPath(
+  org: string,
+  product: string,
+  item: { level: string; specId: string },
+): string {
+  return orgProductPath(org, product, `/backlog/${item.level}/${item.specId}`);
+}
+
 /** Slug used for the single, local org in auth-disabled file mode. */
 export const LOCAL_ORG_SLUG = "local";
 

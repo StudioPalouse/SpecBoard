@@ -124,7 +124,7 @@ export function FeatureRelations({
                   className="flex items-center gap-1 text-sm"
                 >
                   <Link
-                    href={orgHref(`/backlog/${r.otherSpecId}`)}
+                    href={orgHref(`/backlog/${r.otherLevel}/${r.otherSpecId}`)}
                     className="flex-1 truncate hover:underline"
                     title={r.otherTitle}
                   >

@@ -23,6 +23,7 @@ describe("resolveLevels", () => {
       "initiative",
       "epic",
       "feature",
+      "work",
     ]);
     expect(resolveLevels(null)).toEqual(resolveLevels([]));
   });
@@ -41,9 +42,10 @@ describe("resolveLevels", () => {
 
 describe("leafLevel / isLeafLevel", () => {
   it("identifies the deepest level as the leaf", () => {
-    expect(leafLevel().key).toBe("feature");
+    expect(leafLevel().key).toBe("work");
     expect(leafLevel(TWO_LEVEL).key).toBe("story");
-    expect(isLeafLevel("feature")).toBe(true);
+    expect(isLeafLevel("work")).toBe(true);
+    expect(isLeafLevel("feature")).toBe(false);
     expect(isLeafLevel("epic")).toBe(false);
     expect(isLeafLevel("story", TWO_LEVEL)).toBe(true);
   });
@@ -51,11 +53,13 @@ describe("leafLevel / isLeafLevel", () => {
 
 describe("parentLevelKey / childLevelKey", () => {
   it("returns the adjacent level keys", () => {
+    expect(parentLevelKey("work")).toBe("feature");
     expect(parentLevelKey("feature")).toBe("epic");
     expect(parentLevelKey("epic")).toBe("initiative");
     expect(parentLevelKey("initiative")).toBeNull();
     expect(childLevelKey("initiative")).toBe("epic");
-    expect(childLevelKey("feature")).toBeNull();
+    expect(childLevelKey("feature")).toBe("work");
+    expect(childLevelKey("work")).toBeNull();
   });
 
   it("returns null for unknown keys", () => {
@@ -93,14 +97,16 @@ describe("resolveLevelUpdate", () => {
     const { levels, removedKeys } = resolveLevelUpdate(DEFAULT_LEVELS, [
       { key: "initiative", label: "Bet" },
       { key: "epic", label: "Epic" },
-      { key: "feature", label: "Story" },
+      { key: "feature", label: "Feature" },
+      { key: "work", label: "Task" },
     ]);
     expect(levels.map((l) => [l.key, l.label, l.position])).toEqual([
       ["initiative", "Bet", 0],
       ["epic", "Epic", 1],
-      ["feature", "Story", 2],
+      ["feature", "Feature", 2],
+      ["work", "Task", 3],
     ]);
-    expect(levels.filter((l) => l.isLeaf).map((l) => l.key)).toEqual(["feature"]);
+    expect(levels.filter((l) => l.isLeaf).map((l) => l.key)).toEqual(["work"]);
     expect(removedKeys).toEqual([]);
   });
 
@@ -108,8 +114,9 @@ describe("resolveLevelUpdate", () => {
     const { levels, removedKeys } = resolveLevelUpdate(DEFAULT_LEVELS, [
       { key: "epic", label: "Epic" },
       { key: "feature", label: "Feature" },
+      { key: "work", label: "Work Item" },
     ]);
-    expect(levels.map((l) => l.key)).toEqual(["epic", "feature"]);
+    expect(levels.map((l) => l.key)).toEqual(["epic", "feature", "work"]);
     expect(removedKeys).toEqual(["initiative"]);
   });
 
@@ -119,6 +126,7 @@ describe("resolveLevelUpdate", () => {
       { key: "initiative", label: "Initiative" },
       { key: "epic", label: "Epic" },
       { key: "feature", label: "Feature" },
+      { key: "work", label: "Work Item" },
     ]);
     expect(levels[0]).toMatchObject({ key: "big_bet", label: "Big Bet", position: 0 });
   });

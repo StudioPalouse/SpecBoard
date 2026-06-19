@@ -85,7 +85,7 @@ export function FeatureEditSheet({
           <SheetTitle>{feature?.title ?? "Loading…"}</SheetTitle>
           {feature ? (
             <SheetDescription>
-              <Link href={orgHref(`/backlog/${feature.specId}`)} className="hover:underline">
+              <Link href={orgHref(`/backlog/${feature.level}/${feature.specId}`)} className="hover:underline">
                 Open full spec →
               </Link>
             </SheetDescription>

@@ -28,36 +28,59 @@ import { requireWorkspaceAccess } from "@/lib/workspace-access";
 export const dynamic = "force-dynamic";
 
 /**
- * Feature detail: the spec markdown (canonical in git) beside the metadata
- * sidebar (status/priority/quarter/tags, persisted to the metadata store).
+ * Item detail: the spec markdown (canonical in git, leaf items only) beside the
+ * metadata sidebar (status/priority/quarter/tags, persisted to the metadata
+ * store). Grouping levels (initiative/epic/feature) have no spec of their own.
  *
- * The permalink is `/{org}/{product}/backlog/{specId}` — but the spec id is the
- * canonical identity (ADR 0001 D4), so the product segment is just context. If
- * it's stale (the feature has since moved products, or the link used a
- * different product), we redirect to the feature's current product rather than
- * 404 (ADR 0001 D5, "redirect-on-move"). A temporary redirect, not 301 — a
- * feature can move products again, so the mapping must not be cached.
+ * The canonical permalink is `/{org}/{product}/backlog/{level}/{specId}` (ADR
+ * 0002): the level key makes the item's type legible, and the specId is the
+ * identity. We accept two shapes via this catch-all:
+ *  - `[level, specId]` — render; redirect if the level segment is wrong.
+ *  - `[specId]` — the old shallow permalink; 307-redirect to the typed shape.
+ * A stale product segment also redirects to the item's current product (ADR
+ * 0001 D5). Redirects are temporary — a feature can move products / its type is
+ * derived per request — so the mapping must not be cached.
  */
-export default async function FeaturePage({
+export default async function ItemPage({
   params,
 }: {
-  params: Promise<{ org: string; product: string; specId: string }>;
+  params: Promise<{ org: string; product: string; slug: string[] }>;
 }) {
   const access = await requireWorkspaceAccess();
   const org = access?.orgSlug ?? LOCAL_ORG_SLUG;
-  const { product, specId } = await params;
+  const { product, slug } = await params;
+
+  // Parse the catch-all: one segment is a bare specId (old link); two are
+  // [levelKey, specId]; anything else isn't an item route.
+  let levelSeg: string | null;
+  let specId: string;
+  if (slug.length === 1) {
+    levelSeg = null;
+    specId = slug[0]!;
+  } else if (slug.length === 2) {
+    levelSeg = slug[0]!;
+    specId = slug[1]!;
+  } else {
+    notFound();
+  }
+
   const store = await getStore();
   const feature = await store.getFeature(specId, access ?? undefined);
   if (!feature) notFound();
 
-  // The feature's current product is its canonical context; redirect if the URL
-  // segment is stale. `all` is accepted as-is so the cross-product view's links
-  // don't bounce on every click.
+  // Canonicalize: the feature's current product is its context, and its level
+  // key is the type segment. Redirect when either is stale/missing. `all` is
+  // kept as-is so the cross-product view's links don't bounce on every click.
   const products = await store.listProducts(access ?? undefined);
   const productSlug =
     products.find((p) => p.id === feature.productId)?.key ?? ALL_PRODUCTS;
-  if (product !== productSlug && product !== ALL_PRODUCTS)
-    redirect(orgProductPath(org, productSlug, `/backlog/${specId}`));
+  const productStale = product !== productSlug && product !== ALL_PRODUCTS;
+  if (productStale || levelSeg !== feature.level) {
+    const targetProduct = product === ALL_PRODUCTS ? ALL_PRODUCTS : productSlug;
+    redirect(
+      orgProductPath(org, targetProduct, `/backlog/${feature.level}/${specId}`),
+    );
+  }
   const backlogHref = orgProductPath(org, product, "/backlog");
 
   // Assignee options + custom-field definitions for the metadata form.
@@ -152,14 +175,14 @@ export default async function FeaturePage({
               <span className="text-xs font-medium text-muted-foreground">
                 Hierarchy
               </span>
-              {feature.parentSpecId ? (
+              {feature.parentSpecId && parentKey ? (
                 <p className="text-sm">
                   <span className="text-muted-foreground">Parent: </span>
                   <Link
                     href={orgProductPath(
                       org,
                       product,
-                      `/backlog/${feature.parentSpecId}`,
+                      `/backlog/${parentKey}/${feature.parentSpecId}`,
                     )}
                     className="hover:underline"
                   >
@@ -167,7 +190,7 @@ export default async function FeaturePage({
                   </Link>
                 </p>
               ) : null}
-              {feature.children.length > 0 ? (
+              {feature.children.length > 0 && childKey ? (
                 <div className="space-y-1">
                   <p className="text-xs text-muted-foreground">
                     Children · {feature.childDoneCount}/{feature.childCount} done
@@ -176,7 +199,11 @@ export default async function FeaturePage({
                     <div key={c.specId} className="flex items-center gap-2 text-sm">
                       <StatusDot status={c.status} />
                       <Link
-                        href={orgProductPath(org, product, `/backlog/${c.specId}`)}
+                        href={orgProductPath(
+                          org,
+                          product,
+                          `/backlog/${childKey}/${c.specId}`,
+                        )}
                         className="flex-1 truncate hover:underline"
                         title={c.title}
                       >

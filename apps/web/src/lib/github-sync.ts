@@ -1,4 +1,5 @@
 import {
+  leafLevel,
   parseRepoConfigYaml,
   safeParseRepoConfig,
   type RepoConfig,
@@ -9,6 +10,7 @@ import {
   features,
   repositories,
   specIndex,
+  workspaceLevels,
   type Database,
 } from "@specboard/db";
 import {
@@ -133,6 +135,20 @@ export async function syncRepository(db: Database, repo: RepoRecord): Promise<Sy
   // Synced specs land in the workspace's default product (until moved later).
   const productId = await ensureDefaultProduct(db, repo.workspaceId);
 
+  // Specs are the spec-backed leaf; set the level explicitly from the
+  // workspace's configured hierarchy rather than relying on the column default
+  // (which can drift from a workspace that renamed its leaf). See ADR 0002.
+  const levelRows = await db
+    .select({
+      key: workspaceLevels.key,
+      label: workspaceLevels.label,
+      position: workspaceLevels.position,
+      isLeaf: workspaceLevels.isLeaf,
+    })
+    .from(workspaceLevels)
+    .where(eq(workspaceLevels.workspaceId, repo.workspaceId));
+  const leafKey = leafLevel(levelRows.length > 0 ? levelRows : null).key;
+
   // Existing blobShas keyed by specId, to skip unchanged files.
   const existingRows = await db
     .select({ specId: features.specId, blobSha: specIndex.blobSha })
@@ -162,13 +178,19 @@ export async function syncRepository(db: Database, repo: RepoRecord): Promise<Sy
           repoId: repo.id,
           productId,
           specId,
+          level: leafKey,
           title: item.spec.frontmatter.title,
         })
         // productId is set only on insert; an item moved to another product
-        // later keeps its assignment across re-syncs.
+        // later keeps its assignment across re-syncs. level is reconciled so a
+        // spec row always converges to the current leaf.
         .onConflictDoUpdate({
           target: [features.repoId, features.specId],
-          set: { title: item.spec.frontmatter.title, updatedAt: new Date() },
+          set: {
+            title: item.spec.frontmatter.title,
+            level: leafKey,
+            updatedAt: new Date(),
+          },
         })
         .returning({ id: features.id });
       if (!row) throw new Error(`Upsert returned no feature row for spec ${specId}`);

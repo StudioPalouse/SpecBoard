@@ -420,6 +420,7 @@ export class LocalFileStore implements FeatureStore {
   /** Resolve stored edges into per-feature relations + blocked counts. */
   private attachRelations(features: FeatureDetail[], meta: MetadataFile): void {
     const titleBySpec = new Map(features.map((f) => [f.specId, f.title]));
+    const levelBySpec = new Map(features.map((f) => [f.specId, f.level]));
     const bySpec = new Map(features.map((f) => [f.specId, f]));
     for (const [fromSpec, m] of Object.entries(meta)) {
       for (const link of m.links ?? []) {
@@ -431,6 +432,7 @@ export class LocalFileStore implements FeatureStore {
             direction: localDirection(fromSpec, link.type, fromSpec),
             otherSpecId: link.to,
             otherTitle: titleBySpec.get(link.to)!,
+            otherLevel: levelBySpec.get(link.to)!,
           });
           if (link.type === "blocks") from.blocksCount += 1;
         }
@@ -440,6 +442,7 @@ export class LocalFileStore implements FeatureStore {
             direction: localDirection(fromSpec, link.type, link.to),
             otherSpecId: fromSpec,
             otherTitle: titleBySpec.get(fromSpec)!,
+            otherLevel: levelBySpec.get(fromSpec)!,
           });
           if (link.type === "blocks") to.blockedByCount += 1;
         }

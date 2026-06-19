@@ -303,6 +303,7 @@ export class DbStore implements FeatureStore {
               id: features.id,
               specId: features.specId,
               title: features.title,
+              level: features.level,
             })
             .from(features)
             .where(inArray(features.id, otherIds))
@@ -319,6 +320,7 @@ export class DbStore implements FeatureStore {
             direction: directionFor(l, row.id),
             otherSpecId: other.specId,
             otherTitle: other.title,
+            otherLevel: other.level,
           } satisfies FeatureRelation;
         })
         .filter((r): r is FeatureRelation => r !== null);

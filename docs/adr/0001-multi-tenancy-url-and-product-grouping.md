@@ -73,6 +73,10 @@ Subdomain isolation (`{org}.specboard.ai`) is a deferred option for hard
 isolation later.
 
 ### D4 — Separate identity from context in URLs
+> **Superseded by [ADR 0002](0002-work-item-leaf-and-typed-item-urls.md).** Item
+> URLs now carry a level-key type segment, and only the leaf (Work Item) has a
+> git spec id — groupings are app-native, identified by their DB id.
+
 - **Identity = the git spec id** (`features.specId` from frontmatter): global,
   stable, the canonical route param. This is what keeps everything grounded in
   the repo/spec.
@@ -95,6 +99,11 @@ Consequences:
   only the id-uniqueness scope would tighten. We are not committing to that.
 
 ### D6 — "Backlog" is the work area; Board and List are views
+> **Item URL superseded by [ADR 0002](0002-work-item-leaf-and-typed-item-urls.md):**
+> the item permalink is now `/{org}/{product}/backlog/{levelKey}/{specId}` (the
+> bare `/backlog/{specId}` shape still redirects). The area/view decisions below
+> stand.
+
 Board (kanban) and the table are already "two views of the same features"
 (`work-view-tabs.tsx`). Formalize it:
 

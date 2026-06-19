@@ -115,6 +115,10 @@ export async function BoardView({
         )
       ) : (
         <BoardClient
+          // Remount when the board's data set changes (level or product scope).
+          // BoardClient seeds drag-and-drop state from `features` once on mount,
+          // so without a fresh key it would keep showing the prior level's cards.
+          key={`${activeProduct?.id ?? ALL_PRODUCTS}:${activeLevel.key}`}
           features={features}
           parentCandidates={parents}
           columns={columns}

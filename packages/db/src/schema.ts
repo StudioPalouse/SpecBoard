@@ -214,7 +214,7 @@ export const features = pgTable(
      * Hierarchy level key (composite FK to workspace_levels below). Spec-backed
      * rows are always the leaf level; DB-native rows take a higher level.
      */
-    level: text("level").notNull().default("feature"),
+    level: text("level").notNull().default("work"),
     title: text("title").notNull(),
     status: text("status").notNull().default("backlog"),
     assigneeId: uuid("assignee_id"),

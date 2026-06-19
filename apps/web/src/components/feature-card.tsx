@@ -77,7 +77,7 @@ export function FeatureCard({
         ) : null}
         <CardTitle className="text-sm">
           <Link
-            href={orgHref(`/backlog/${feature.specId}`)}
+            href={orgHref(`/backlog/${feature.level}/${feature.specId}`)}
             className="hover:underline"
             onPointerDown={stop}
             onClick={stop}

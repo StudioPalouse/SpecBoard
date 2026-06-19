@@ -12,7 +12,12 @@ import { fileURLToPath } from "node:url";
 
 import { eq } from "drizzle-orm";
 
-import { DEFAULT_LEVELS, DEFAULT_PRODUCT_KEY, parseSpec } from "@specboard/core";
+import {
+  DEFAULT_LEVELS,
+  DEFAULT_PRODUCT_KEY,
+  leafLevel,
+  parseSpec,
+} from "@specboard/core";
 
 import { createDb } from "./client.js";
 import {
@@ -141,6 +146,7 @@ for (const file of files) {
       repoId: repository!.id,
       productId: product!.id,
       specId: parsed.frontmatter.id,
+      level: leafLevel(DEFAULT_LEVELS).key,
       title: parsed.frontmatter.title,
       status: meta.status ?? "backlog",
       priority: meta.priority ?? null,

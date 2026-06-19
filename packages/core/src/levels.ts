@@ -17,11 +17,16 @@ export interface WorkspaceLevel {
   isLeaf: boolean;
 }
 
-/** Default three-level hierarchy seeded for every new workspace. */
+/**
+ * Default four-level hierarchy seeded for every new workspace. Only the leaf
+ * (Work Item) is git-spec-backed; Initiative / Epic / Feature are DB-native
+ * grouping records (ADR 0002).
+ */
 export const DEFAULT_LEVELS: readonly WorkspaceLevel[] = [
   { key: "initiative", label: "Initiative", position: 0, isLeaf: false },
   { key: "epic", label: "Epic", position: 1, isLeaf: false },
-  { key: "feature", label: "Feature", position: 2, isLeaf: true },
+  { key: "feature", label: "Feature", position: 2, isLeaf: false },
+  { key: "work", label: "Work Item", position: 3, isLeaf: true },
 ];
 
 /**

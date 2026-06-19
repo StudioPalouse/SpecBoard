@@ -114,7 +114,7 @@ export function BacklogTable({
                     <span className="text-muted-foreground">↳</span>
                   ) : null}
                   <Link
-                    href={orgHref(`/backlog/${f.specId}`)}
+                    href={orgHref(`/backlog/${f.level}/${f.specId}`)}
                     className="font-medium hover:underline"
                   >
                     {f.title}

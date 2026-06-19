@@ -143,6 +143,8 @@ export interface FeatureRelation {
   /** The feature on the other end of the relation. */
   otherSpecId: string;
   otherTitle: string;
+  /** The other feature's level key, for building its typed permalink. */
+  otherLevel: string;
 }
 
 export interface RelationInput {
