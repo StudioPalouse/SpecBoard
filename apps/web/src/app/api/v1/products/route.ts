@@ -37,8 +37,8 @@ export async function POST(req: Request) {
       parseCreateProductInput(body),
       authz.scope ?? undefined,
     );
-    for (const path of ["/board", "/roadmap", "/settings/products"])
-      revalidatePath(path);
+    for (const path of ["/[org]/board", "/[org]/roadmap", "/[org]/settings/products"])
+      revalidatePath(path, "page");
     return Response.json({ product }, { status: 201 });
   } catch (err) {
     if (err instanceof InvalidPatchError || err instanceof ProductError) {

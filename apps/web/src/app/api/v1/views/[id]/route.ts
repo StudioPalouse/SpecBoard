@@ -14,6 +14,6 @@ export async function DELETE(req: Request, { params }: Params) {
 
   const { id } = await params;
   await deleteSavedView(id, authz.scope ?? undefined);
-  revalidatePath("/backlog");
+  revalidatePath("/[org]/backlog", "page");
   return new Response(null, { status: 204 });
 }

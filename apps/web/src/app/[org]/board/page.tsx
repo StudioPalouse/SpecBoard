@@ -1,6 +1,6 @@
 import { parentLevelKey, resolveEstimateConfig, resolveWorkflow } from "@specboard/core";
 
-import { BoardClient } from "@/app/board/board-client";
+import { BoardClient } from "./board-client";
 import { CardFieldsMenu } from "@/components/card-fields-menu";
 import { EmptyState } from "@/components/empty-state";
 import { LevelSwitcher } from "@/components/level-switcher";

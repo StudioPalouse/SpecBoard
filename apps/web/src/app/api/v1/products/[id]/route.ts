@@ -40,8 +40,8 @@ export async function PATCH(req: Request, { params }: Params) {
       parseProductPatch(body),
       authz.scope ?? undefined,
     );
-    for (const path of ["/board", "/roadmap", "/settings/products"])
-      revalidatePath(path);
+    for (const path of ["/[org]/board", "/[org]/roadmap", "/[org]/settings/products"])
+      revalidatePath(path, "page");
     return Response.json({ product });
   } catch (err) {
     if (err instanceof InvalidPatchError || err instanceof ProductError) {
@@ -61,8 +61,8 @@ export async function DELETE(req: Request, { params }: Params) {
 
   try {
     await deleteProduct(id, authz.scope ?? undefined);
-    for (const path of ["/board", "/roadmap", "/settings/products"])
-      revalidatePath(path);
+    for (const path of ["/[org]/board", "/[org]/roadmap", "/[org]/settings/products"])
+      revalidatePath(path, "page");
     return new Response(null, { status: 204 });
   } catch (err) {
     if (err instanceof ProductError) {

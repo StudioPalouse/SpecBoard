@@ -16,6 +16,7 @@ import { StatusDot } from "@/components/status-dot";
 import { WorkItemCreate } from "@/components/work-item-create";
 import { resolveActiveLevel } from "@/lib/active-level";
 import { resolveActiveProduct } from "@/lib/active-product";
+import { LOCAL_ORG_SLUG, orgPath } from "@/lib/org-path";
 import {
   priorityLabel,
   sortFeatures,
@@ -35,6 +36,7 @@ export default async function RoadmapPage({
 }) {
   const access = await requireWorkspaceAccess();
   const canEdit = !access || canWrite(access.role);
+  const org = access?.orgSlug ?? LOCAL_ORG_SLUG;
   const params = await searchParams;
   const store = await getStore();
   const allFeatures = sortFeatures(
@@ -111,7 +113,7 @@ export default async function RoadmapPage({
                   <CardHeader className="space-y-1 p-3">
                     <CardTitle className="text-sm">
                       <Link
-                        href={`/feature/${f.specId}`}
+                        href={orgPath(org, `/feature/${f.specId}`)}
                         className="hover:underline"
                       >
                         {f.title}

@@ -2,6 +2,8 @@ import Link from "next/link";
 
 import { buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { orgPath } from "@/lib/org-path";
+import { currentOrgSlug } from "@/lib/workspace-access";
 
 /**
  * Shown on the board views when a workspace has no specs yet — i.e. the first
@@ -9,7 +11,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
  * Points the user at connecting a GitHub repository (the git-native source of
  * truth) rather than leaving a blank screen.
  */
-export function EmptyState({ canConnect = false }: { canConnect?: boolean }) {
+export async function EmptyState({ canConnect = false }: { canConnect?: boolean }) {
+  const reposHref = orgPath(await currentOrgSlug(), "/settings/repositories");
   return (
     <Card className="mx-auto mt-8 max-w-lg">
       <CardHeader>
@@ -26,7 +29,7 @@ export function EmptyState({ canConnect = false }: { canConnect?: boolean }) {
             : "Once an admin connects the repository where your specs live, features will appear here automatically."}
         </p>
         {canConnect ? (
-          <Link href="/settings/repositories" className={buttonVariants({ size: "sm" })}>
+          <Link href={reposHref} className={buttonVariants({ size: "sm" })}>
             Connect a repository
           </Link>
         ) : null}

@@ -42,7 +42,7 @@ export async function POST(req: Request) {
       parseCreateFeatureInput(body),
       authz.scope ?? undefined,
     );
-    for (const path of ["/backlog", "/board", "/roadmap"]) revalidatePath(path);
+    for (const path of ["/[org]/backlog", "/[org]/board", "/[org]/roadmap"]) revalidatePath(path, "page");
     return Response.json({ feature }, { status: 201 });
   } catch (err) {
     if (err instanceof InvalidPatchError || err instanceof FeatureError) {

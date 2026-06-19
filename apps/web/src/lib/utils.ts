@@ -11,7 +11,7 @@ export function cn(...inputs: ClassValue[]) {
  * single "/" (rejecting "//host" protocol-relative URLs and absolute URLs);
  * anything else falls back to `fallback`.
  */
-export function safeRedirectPath(from: string | null, fallback = "/backlog"): string {
+export function safeRedirectPath(from: string | null, fallback = "/"): string {
   if (!from || !from.startsWith("/") || from.startsWith("//")) return fallback;
   return from;
 }

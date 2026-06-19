@@ -18,6 +18,7 @@ import {
 
 import { getDb } from "@/lib/db";
 import { statusLabel } from "@/lib/feature-helpers";
+import { LOCAL_ORG_SLUG, orgPath } from "@/lib/org-path";
 import { resolveRepoConfig } from "@/lib/repo-config";
 import { getStore } from "@/lib/store";
 import { canWrite, listWorkspaceMembers, type WorkspaceMember } from "@/lib/workspace";
@@ -35,6 +36,7 @@ export default async function FeaturePage({
   params: Promise<{ id: string }>;
 }) {
   const access = await requireWorkspaceAccess();
+  const org = access?.orgSlug ?? LOCAL_ORG_SLUG;
   const { id } = await params;
   const store = await getStore();
   const feature = await store.getFeature(id, access ?? undefined);
@@ -77,7 +79,7 @@ export default async function FeaturePage({
       <article>
         <div className="mb-6 space-y-1">
           <Link
-            href="/backlog"
+            href={orgPath(org, "/backlog")}
             className="text-xs text-muted-foreground hover:underline"
           >
             ← Backlog
@@ -136,7 +138,7 @@ export default async function FeaturePage({
                 <p className="text-sm">
                   <span className="text-muted-foreground">Parent: </span>
                   <Link
-                    href={`/feature/${feature.parentSpecId}`}
+                    href={orgPath(org, `/feature/${feature.parentSpecId}`)}
                     className="hover:underline"
                   >
                     {feature.parentTitle ?? feature.parentSpecId}
@@ -152,7 +154,7 @@ export default async function FeaturePage({
                     <div key={c.specId} className="flex items-center gap-2 text-sm">
                       <StatusDot status={c.status} />
                       <Link
-                        href={`/feature/${c.specId}`}
+                        href={orgPath(org, `/feature/${c.specId}`)}
                         className="flex-1 truncate hover:underline"
                         title={c.title}
                       >

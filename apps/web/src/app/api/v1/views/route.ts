@@ -35,7 +35,7 @@ export async function POST(req: Request) {
       parseSavedViewInput(body),
       authz.scope ?? undefined,
     );
-    revalidatePath("/backlog");
+    revalidatePath("/[org]/backlog", "page");
     return Response.json({ view }, { status: 201 });
   } catch (err) {
     if (err instanceof InvalidViewError) {

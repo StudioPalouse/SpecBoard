@@ -4,7 +4,8 @@ import { getSessionUser } from "@/lib/auth-session";
 import { getDb } from "@/lib/db";
 import { saveCredentials } from "@/lib/github-app";
 import { APP_SETUP_COOKIE } from "@/lib/github-install";
-import { getMembership } from "@/lib/workspace";
+import { orgPath } from "@/lib/org-path";
+import { getMembership, workspaceSlug } from "@/lib/workspace";
 
 export const dynamic = "force-dynamic";
 
@@ -40,8 +41,11 @@ export async function GET(req: Request) {
   }
 
   const membership = await getMembership(db, user.id);
-  if (!membership || membership.role !== "admin") {
-    return redirectTo("/settings/repositories?error=forbidden");
+  if (!membership) return redirectTo("/");
+  const slug = await workspaceSlug(db, membership.workspaceId);
+  const repos = (q = "") => orgPath(slug, `/settings/repositories${q}`);
+  if (membership.role !== "admin") {
+    return redirectTo(repos("?error=forbidden"));
   }
 
   // CSRF: the state must match the nonce we set when starting the flow.
@@ -49,7 +53,7 @@ export async function GET(req: Request) {
   const expected = jar.get(APP_SETUP_COOKIE)?.value;
   jar.delete(APP_SETUP_COOKIE);
   if (!code || !state || !expected || state !== expected) {
-    return redirectTo("/settings/repositories?error=setup");
+    return redirectTo(repos("?error=setup"));
   }
 
   let result: ConversionResult;
@@ -69,7 +73,7 @@ export async function GET(req: Request) {
     result = (await res.json()) as ConversionResult;
   } catch (err) {
     console.error("[github] app manifest conversion failed:", err);
-    return redirectTo("/settings/repositories?error=exchange");
+    return redirectTo(repos("?error=exchange"));
   }
 
   try {
@@ -82,8 +86,8 @@ export async function GET(req: Request) {
     });
   } catch (err) {
     console.error("[github] failed to store app credentials:", err);
-    return redirectTo("/settings/repositories?error=store");
+    return redirectTo(repos("?error=store"));
   }
 
-  return redirectTo("/settings/repositories?setup=done");
+  return redirectTo(repos("?setup=done"));
 }

@@ -11,6 +11,7 @@ import {
 } from "@specboard/db";
 import { DEFAULT_LEVELS, DEFAULT_PRODUCT_KEY } from "@specboard/core";
 
+import { LOCAL_ORG_SLUG } from "@/lib/org-path";
 import { isMultiTenant } from "@/lib/tenancy";
 
 export type Workspace = typeof workspaces.$inferSelect;
@@ -181,6 +182,15 @@ export async function getMembershipFor(
   return rows[0] ?? null;
 }
 
+/** A workspace's URL slug by id, falling back to the local slug when missing. */
+export async function workspaceSlug(
+  db: Database,
+  workspaceId: string,
+): Promise<string> {
+  const workspace = await getWorkspaceById(db, workspaceId);
+  return workspace?.slug ?? LOCAL_ORG_SLUG;
+}
+
 /** Look up a workspace by its URL slug, or null when no such org exists. */
 export async function getWorkspaceBySlug(
   db: Database,
@@ -246,7 +256,14 @@ export async function resolveActiveWorkspace(
     if (!workspace) return null;
     return getMembershipFor(db, userId, workspace.id);
   }
-  return ensureMembership(db, userId);
+  // Single-tenant: the one workspace, auto-joined. If the URL carries a slug it
+  // must match — otherwise the URL is lying about which org you're in.
+  const membership = await ensureMembership(db, userId);
+  if (membership && opts.orgSlug) {
+    const workspace = await getActiveWorkspace(db);
+    if (workspace && workspace.slug !== opts.orgSlug) return null;
+  }
+  return membership;
 }
 
 const SLUG_MAX = 48;
