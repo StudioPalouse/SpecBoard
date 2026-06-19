@@ -215,6 +215,12 @@ export const features = pgTable(
      * rows are always the leaf level; DB-native rows take a higher level.
      */
     level: text("level").notNull().default("work"),
+    /**
+     * Stable grouping key for sync-created Feature groupings (the spec's
+     * `feature` frontmatter or its folder path). Lets re-sync find the same
+     * Feature instead of duplicating it. NULL for user-created rows. See ADR 0002.
+     */
+    externalKey: text("external_key"),
     title: text("title").notNull(),
     status: text("status").notNull().default("backlog"),
     assigneeId: uuid("assignee_id"),
@@ -244,6 +250,7 @@ export const features = pgTable(
     index("features_parent_idx").on(t.parentId),
     index("features_product_idx").on(t.productId),
     index("features_workspace_level_idx").on(t.workspaceId, t.level),
+    index("features_external_key_idx").on(t.workspaceId, t.externalKey),
     foreignKey({
       columns: [t.workspaceId, t.level],
       foreignColumns: [workspaceLevels.workspaceId, workspaceLevels.key],

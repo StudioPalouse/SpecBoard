@@ -1,5 +1,8 @@
+import { randomUUID } from "node:crypto";
+
 import {
   leafLevel,
+  parentLevelKey,
   parseRepoConfigYaml,
   safeParseRepoConfig,
   type RepoConfig,
@@ -38,6 +41,32 @@ export interface SyncSummary {
   skipped: number;
   /** Specs that had a stable id injected back into git during this sync. */
   idsInjected: number;
+  /** Feature groupings auto-created to home newly-synced work items. */
+  featuresCreated: number;
+}
+
+/**
+ * The grouping key for a spec's Feature: its `feature` frontmatter when set,
+ * else its folder path (so specs in the same directory share a Feature). Falls
+ * back to a per-spec key for a spec at the repo root (keeps it 1:1).
+ */
+function featureKeyFor(frontmatterFeature: string | undefined, path: string, specId: string): string {
+  const declared = frontmatterFeature?.trim();
+  if (declared) return `feature:${declared}`;
+  const dir = path.includes("/") ? path.slice(0, path.lastIndexOf("/")) : "";
+  return dir ? `path:${dir}` : `spec:${specId}`;
+}
+
+/** Human label for an auto-created Feature, derived from its grouping key. */
+function featureTitleFor(key: string, fallbackTitle: string): string {
+  const raw = key.startsWith("feature:")
+    ? key.slice("feature:".length)
+    : key.startsWith("path:")
+      ? key.slice(key.lastIndexOf("/") + 1)
+      : "";
+  const cleaned = raw.replace(/[-_]+/g, " ").trim();
+  if (!cleaned) return fallbackTitle;
+  return cleaned.replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
 /** The spec globs configured for a repo, falling back to the default. */
@@ -147,7 +176,11 @@ export async function syncRepository(db: Database, repo: RepoRecord): Promise<Sy
     })
     .from(workspaceLevels)
     .where(eq(workspaceLevels.workspaceId, repo.workspaceId));
-  const leafKey = leafLevel(levelRows.length > 0 ? levelRows : null).key;
+  const levels = levelRows.length > 0 ? levelRows : null;
+  const leafKey = leafLevel(levels).key;
+  // The level a Feature grouping sits at (one above the spec leaf). Null only
+  // for a single-level hierarchy, where there's nowhere to home work items.
+  const featureLevelKey = parentLevelKey(leafKey, levels);
 
   // Existing blobShas keyed by specId, to skip unchanged files.
   const existingRows = await db
@@ -157,7 +190,12 @@ export async function syncRepository(db: Database, repo: RepoRecord): Promise<Sy
     .where(eq(features.repoId, repo.id));
   const existingBlob = new Map(existingRows.map((r) => [r.specId, r.blobSha]));
 
-  const summary: SyncSummary = { upserted: 0, skipped: 0, idsInjected: 0 };
+  const summary: SyncSummary = {
+    upserted: 0,
+    skipped: 0,
+    idsInjected: 0,
+    featuresCreated: 0,
+  };
 
   await db.transaction(async (tx) => {
     for (const item of reconciled) {
@@ -192,8 +230,47 @@ export async function syncRepository(db: Database, repo: RepoRecord): Promise<Sy
             updatedAt: new Date(),
           },
         })
-        .returning({ id: features.id });
+        .returning({ id: features.id, parentId: features.parentId });
       if (!row) throw new Error(`Upsert returned no feature row for spec ${specId}`);
+
+      // Home the work item under a Feature grouping. Only when it has no parent
+      // yet — so a re-sync never overrides a parent a user set in the app. The
+      // Feature is found (or created) by a stable grouping key so re-syncs and
+      // sibling specs reuse it rather than spawning duplicates.
+      if (featureLevelKey && row.parentId === null) {
+        const key = featureKeyFor(item.spec.frontmatter.feature, item.path, specId);
+        const existing = await tx
+          .select({ id: features.id })
+          .from(features)
+          .where(
+            and(
+              eq(features.workspaceId, repo.workspaceId),
+              eq(features.externalKey, key),
+              eq(features.level, featureLevelKey),
+            ),
+          )
+          .limit(1);
+        let featureId = existing[0]?.id;
+        if (!featureId) {
+          const newId = randomUUID();
+          await tx.insert(features).values({
+            id: newId,
+            workspaceId: repo.workspaceId,
+            repoId: null,
+            productId,
+            specId: newId,
+            level: featureLevelKey,
+            externalKey: key,
+            title: featureTitleFor(key, item.spec.frontmatter.title),
+          });
+          featureId = newId;
+          summary.featuresCreated += 1;
+        }
+        await tx
+          .update(features)
+          .set({ parentId: featureId })
+          .where(eq(features.id, row.id));
+      }
 
       const parsed = { title: item.spec.frontmatter.title, sections: item.spec.sections };
       await tx

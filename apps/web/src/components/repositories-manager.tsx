@@ -47,6 +47,7 @@ function syncMessage(sync: SyncResult | { error: string }): { kind: "ok" | "erro
   if ("error" in sync) return { kind: "error", message: sync.error };
   const parts = [`${sync.upserted} imported`, `${sync.skipped} unchanged`];
   if (sync.idsInjected > 0) parts.push(`${sync.idsInjected} stable id(s) assigned`);
+  if (sync.featuresCreated > 0) parts.push(`${sync.featuresCreated} feature(s) created`);
   return { kind: "ok", message: parts.join(" · ") };
 }
 
