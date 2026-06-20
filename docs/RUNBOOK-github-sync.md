@@ -7,7 +7,7 @@ the steps are identical, just swap the host.
 | Env | App host | Webhook URL |
 | --- | --- | --- |
 | test | `https://test.specboard.ai` | `https://test.specboard.ai/api/webhooks/github` |
-| prod | `https://specboard.ai` | `https://specboard.ai/api/webhooks/github` |
+| prod | `https://app.specboard.ai` | `https://app.specboard.ai/api/webhooks/github` |
 
 The recommended path is the **in-app one-click setup** (no GitHub form-filling,
 no secrets to copy). The manual env-based path is kept as an appendix for
