@@ -38,15 +38,21 @@ infra/
 
 ## Repo conventions for specs
 
-Specs live under `specs/<feature>/spec.md` with YAML frontmatter:
+Specs are **work items** (the spec-backed leaf of the hierarchy). They live under
+`specs/<feature>/spec.md` with YAML frontmatter:
 
 ```yaml
 ---
 id: <uuid> # stable link to SpecBoard metadata (survives renames)
 title: My Feature
 kind: feature
+feature: checkout # optional: groups this spec under a named Feature (else its folder is used)
 ---
 ```
+
+On import each spec is homed under a **Feature** grouping — by its `feature:` value
+when set, otherwise by its folder (specs in the same directory share a Feature). The
+hierarchy above the leaf (Feature → Epic → Initiative) is managed in the app, not git.
 
 Per-repo config (which globs are specs, workflow, custom fields, write mode)
 lives in [`.specboard/config.yml`](./.specboard/config.yml).

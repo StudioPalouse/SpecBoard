@@ -52,7 +52,12 @@ Nothing to copy by hand.
 ## 3. Verify
 
 - **Initial import:** the `sync` summary above should show `upserted > 0`; the
-  board now lists the repo's specs.
+  board now lists the repo's specs (as **Work Items**, the spec-backed leaf).
+- **Feature grouping:** the summary's `featuresCreated` counts Feature groupings
+  auto-created to home new work items. Each spec lands under a Feature chosen by a
+  stable key — its `feature:` frontmatter when set, else its folder path (so specs
+  in the same directory share a Feature). Sync only assigns a Feature when the work
+  item has none, so re-syncs never override a parent you set in the app.
 - **Stable ids:** specs that lacked an `id` get a `chore(specboard): assign
   stable id …` commit on `main`.
 - **Live sync:** push a change to any `specs/**/spec.md`; GitHub App → Advanced →

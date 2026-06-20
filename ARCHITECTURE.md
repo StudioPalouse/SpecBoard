@@ -35,6 +35,13 @@ metadata. On first import of a spec without an `id`, the git service injects one
 single commit (`packages/git` → `injectSpecId`). Path + blob `sha` are cached in
 `spec_index` for fast lookup and drift/conflict detection.
 
+Only the **leaf** level (Work Item) is spec-backed; the grouping levels above it
+(Initiative / Epic / Feature) are **DB-native** rows with no git spec — each takes a
+synthetic `spec_id` equal to its row id so every item is uniformly routable. Item
+permalinks are type-segmented by level: `/{org}/{product}/backlog/{levelKey}/{specId}`
+(the bare `/backlog/{specId}` still redirects). See
+[`docs/adr/0002-work-item-leaf-and-typed-item-urls.md`](docs/adr/0002-work-item-leaf-and-typed-item-urls.md).
+
 ## Components
 
 ```
@@ -61,8 +68,9 @@ Next.js web app  ── apps/web           MCP server ── apps/mcp
   (`resolveLevels`/`leafLevel`/`parentLevelKey`/`resolveLevelUpdate` — depth, the
   spec-backed leaf, and parent/child level rules). Unit-tested.
 - **`packages/db`** — Drizzle schema (`workspaces`, `members`, `repositories`,
-  `workspace_levels` (per-workspace hierarchy config — e.g. Initiative → Epic →
-  Feature), `features` (with a self-referential `parent_id` for the work hierarchy,
+  `workspace_levels` (per-workspace hierarchy config — default Initiative → Epic →
+  Feature → Work Item, where only the leaf is spec-backed), `features` (with a
+  self-referential `parent_id` for the work hierarchy,
   a `level` column composite-FK'd to `workspace_levels`, a nullable `repo_id` for
   DB-native items above the leaf, and a fractional `rank` for manual board ordering),
   `feature_links` (typed dependencies/relations between features),
@@ -89,6 +97,9 @@ Next.js web app  ── apps/web           MCP server ── apps/mcp
    (GitHub App *manifest* flow; credentials stored encrypted in `github_app`),
    installs it and picks repos, then connects one → scan `specs/**` per
    `.specboard/config.yml` → create `features` + `spec_index`, injecting missing `id`s.
+   Each spec's work item is homed under a Feature grouping — found or created by a
+   stable key (the spec's `feature:` frontmatter, else its folder), so the hierarchy
+   fills in on import without overriding any parent set later in the app (ADR 0002).
 2. **Reconcile on push** — `push` webhook → re-parse changed specs → update `spec_index`;
    `blob_sha` detects drift/conflicts. The same webhook handles `pull_request`/`issues`
    events to refresh the cached state of any `feature_github_links` (open → merged/closed).
@@ -105,6 +116,11 @@ Next.js web app  ── apps/web           MCP server ── apps/mcp
 **RLS** isolates tenants (`specboard_is_member(workspace_id)` via the
 `app.user_id` transaction-local session variable set by the app).
 SaaS = many workspaces on shared infra; self-host = a single workspace.
+
+Org and product are **URL path prefixes** (`/{org}/{product}/…`); the slug is a hint
+whose authority is re-checked against membership server-side, and a product is a DB
+grouping (`features.product_id`) that can span repos. See
+[`docs/adr/0001-multi-tenancy-url-and-product-grouping.md`](docs/adr/0001-multi-tenancy-url-and-product-grouping.md).
 
 ## Open-core boundary
 
