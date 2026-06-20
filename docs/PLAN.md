@@ -29,6 +29,13 @@ fills the gap.
 > manual workflow dispatch), with Better Auth endpoints, consumer
 > email-domain blocking, a versioned `/api/v1` layer, and Postmark email.
 > Current next steps live in that doc's [Next steps] section.
+>
+> **Amendment (2026-06-19):** multi-tenancy and the work hierarchy are now
+> governed by ADRs — [`adr/0001`](./adr/0001-multi-tenancy-url-and-product-grouping.md)
+> (one codebase, always multi-tenant; `/{org}/{product}/` URL prefix; products as
+> DB groupings) and [`adr/0002`](./adr/0002-work-item-leaf-and-typed-item-urls.md)
+> (default hierarchy Initiative → Epic → Feature → Work Item with only the leaf
+> spec-backed; type-segmented item URLs `/{org}/{product}/backlog/{level}/{specId}`).
 
 ### Decisions locked with the user
 - **Source of truth:** spec **content lives in git** (canonical); **metadata lives in the DB**,

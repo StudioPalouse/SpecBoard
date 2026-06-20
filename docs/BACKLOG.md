@@ -15,7 +15,9 @@ and tagged with a `tier-*` and `area:*` label.
 Backlog / Board / Roadmap (by quarter) views · 5-stage status workflow · assignee ·
 priority · manual rank · tags · custom fields · per-feature comments · activity log ·
 drag-and-drop board (status + reorder) · in-context card editing · per-user
-customizable card fields · GitHub sync · GitHub PR/issue/branch links on features ·
+customizable card fields · configurable multi-level hierarchy (Initiative → Epic →
+Feature → Work Item) · multi-product backlogs under `/{org}/{product}/` · GitHub sync
+(specs auto-homed under Feature groupings) · GitHub PR/issue/branch links on features ·
 MCP server for agents.
 
 The backlog below is the **gap** between that and what the four reference tools treat as baseline.
