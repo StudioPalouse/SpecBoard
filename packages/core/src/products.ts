@@ -17,10 +17,52 @@ export interface Product {
   visibility: ProductVisibility;
   /** Manual ordering in the product switcher; ascending. */
   position: number;
+  /** Chosen accent color token (see `PRODUCT_COLORS`), or null to derive one
+   * deterministically from the key via `resolveProductColor`. */
+  color: string | null;
 }
 
 /** The reserved key for the default product seeded on migration / first run. */
 export const DEFAULT_PRODUCT_KEY = "default";
+
+/**
+ * The accent-color palette a product can be tagged with. Stored as a stable
+ * token (not a hex value) so the UI maps it to theme-aware classes and the set
+ * stays closed/validatable. Order also drives the deterministic fallback.
+ */
+export const PRODUCT_COLORS = [
+  "slate",
+  "red",
+  "orange",
+  "amber",
+  "green",
+  "teal",
+  "sky",
+  "blue",
+  "violet",
+  "pink",
+] as const;
+
+export type ProductColor = (typeof PRODUCT_COLORS)[number];
+
+/**
+ * The product's accent color: its explicit `color` when set to a known token,
+ * otherwise one derived deterministically from its `key` so every product is
+ * visually distinct out of the box (no backfill) yet stable across renders.
+ */
+export function resolveProductColor(p: {
+  color?: string | null;
+  key: string;
+}): ProductColor {
+  if (p.color && (PRODUCT_COLORS as readonly string[]).includes(p.color)) {
+    return p.color as ProductColor;
+  }
+  let hash = 0;
+  for (let i = 0; i < p.key.length; i++) {
+    hash = (hash * 31 + p.key.charCodeAt(i)) >>> 0;
+  }
+  return PRODUCT_COLORS[hash % PRODUCT_COLORS.length] ?? PRODUCT_COLORS[0];
+}
 
 const KEY_MAX = 48;
 

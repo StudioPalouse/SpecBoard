@@ -212,6 +212,9 @@ export interface ProductRecord {
   description: string | null;
   visibility: ProductVisibility;
   position: number;
+  /** Accent-color token, or null to derive one from the key (see core
+   * `resolveProductColor`). */
+  color: string | null;
   /** Count of work items in this product. */
   itemCount: number;
   /** The acting user's explicit role on this product, or null (org admins
@@ -223,6 +226,7 @@ export interface CreateProductInput {
   name: string;
   description?: string | null;
   visibility?: ProductVisibility;
+  color?: string | null;
 }
 
 export type ProductPatch = Partial<{
@@ -230,6 +234,7 @@ export type ProductPatch = Partial<{
   description: string | null;
   visibility: ProductVisibility;
   position: number;
+  color: string | null;
 }>;
 
 /** A user's membership of one product, joined to their identity. */

@@ -86,6 +86,9 @@ export const products = pgTable(
     name: text("name").notNull(),
     description: text("description"),
     visibility: productVisibility("visibility").notNull().default("org"),
+    /** Accent-color token (see core `PRODUCT_COLORS`). Nullable: a null row
+     * derives a stable color from its key via `resolveProductColor`. */
+    color: text("color"),
     /** Manual ordering in the product switcher; ascending. */
     position: integer("position").notNull().default(0),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),

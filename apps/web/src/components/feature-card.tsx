@@ -9,8 +9,13 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { StatusSelect } from "@/components/status-select";
 import { CUSTOM_FIELD_PREFIX } from "@/lib/card-fields";
 import { priorityLabel } from "@/lib/feature-helpers";
+import { productColorClasses } from "@/lib/product-color";
 import type { CustomFieldValue, FeatureRecord } from "@/lib/store/types";
 import { useOrgProductPath } from "@/lib/use-org";
+import { cn } from "@/lib/utils";
+
+/** A product's identity for the attribution badge shown in cross-product views. */
+export type ProductTag = { name: string; key: string; color: string | null };
 
 /** Stop a pointer/click on an interactive control from starting a card drag. */
 function stop(e: React.PointerEvent | React.MouseEvent) {
@@ -37,6 +42,7 @@ export function FeatureCard({
   workflow,
   canEdit,
   onOpen,
+  product,
 }: {
   feature: FeatureRecord;
   fields: string[];
@@ -47,6 +53,9 @@ export function FeatureCard({
   workflow?: StatusWorkflow;
   canEdit: boolean;
   onOpen: () => void;
+  /** The owning product, shown as a badge in the cross-product ("All
+   * products") view; omitted when the board is scoped to one product. */
+  product?: ProductTag;
 }) {
   const orgHref = useOrgProductPath();
   const show = new Set(fields);
@@ -70,6 +79,14 @@ export function FeatureCard({
       onClick={onOpen}
     >
       <CardHeader className="space-y-1 p-3">
+        {product ? (
+          <Badge
+            variant="secondary"
+            className={cn("w-fit border-transparent text-[10px]", productColorClasses(product).badge)}
+          >
+            {product.name}
+          </Badge>
+        ) : null}
         {featuredValue ? (
           <Badge variant="secondary" className="w-fit text-[10px]">
             {customFieldLabels[featured!] ?? featured}: {featuredValue}

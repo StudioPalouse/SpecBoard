@@ -14,11 +14,14 @@ import {
 } from "@/components/ui/table";
 import type { StatusWorkflow } from "@specboard/core";
 
+import { type ProductTag } from "@/components/feature-card";
 import { StatusDot } from "@/components/status-dot";
 import { StatusSelect } from "@/components/status-select";
 import { priorityLabel } from "@/lib/feature-helpers";
+import { productColorClasses } from "@/lib/product-color";
 import type { FeatureRecord } from "@/lib/store/types";
 import { useOrgProductPath } from "@/lib/use-org";
+import { cn } from "@/lib/utils";
 
 export interface BacklogRow {
   feature: FeatureRecord;
@@ -37,10 +40,14 @@ export function BacklogTable({
   rows,
   canEdit,
   workflow,
+  productsById,
 }: {
   rows: BacklogRow[];
   canEdit: boolean;
   workflow?: StatusWorkflow;
+  /** Product identity by id; when set, a Product column is shown (the
+   * cross-product "All products" view). */
+  productsById?: Record<string, ProductTag>;
 }) {
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const orgHref = useOrgProductPath();
@@ -80,6 +87,7 @@ export function BacklogTable({
         <TableRow>
           <TableHead className="w-14">Pri</TableHead>
           <TableHead>Feature</TableHead>
+          {productsById ? <TableHead className="w-32">Product</TableHead> : null}
           <TableHead className="w-44">Status</TableHead>
           <TableHead className="w-14">Est</TableHead>
           <TableHead>Tags</TableHead>
@@ -140,6 +148,23 @@ export function BacklogTable({
                 </span>
                 <div className="text-xs text-muted-foreground">{f.path}</div>
               </TableCell>
+              {productsById ? (
+                <TableCell>
+                  {(() => {
+                    const p = f.productId ? productsById[f.productId] : undefined;
+                    return p ? (
+                      <Badge
+                        variant="secondary"
+                        className={cn("border-transparent text-[10px]", productColorClasses(p).badge)}
+                      >
+                        {p.name}
+                      </Badge>
+                    ) : (
+                      <span className="text-muted-foreground">—</span>
+                    );
+                  })()}
+                </TableCell>
+              ) : null}
               <TableCell>
                 <div className="flex items-center gap-2">
                   <StatusDot status={f.status} />

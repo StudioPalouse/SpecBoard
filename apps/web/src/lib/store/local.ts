@@ -70,6 +70,7 @@ interface LocalProduct {
   description: string | null;
   visibility: "org" | "private";
   position: number;
+  color?: string | null;
 }
 
 /** The default product seeded when none is persisted (id is stable). */
@@ -80,6 +81,7 @@ const LOCAL_DEFAULT_PRODUCT: LocalProduct = {
   description: null,
   visibility: "org",
   position: 0,
+  color: null,
 };
 
 /** Zero GitHub-link aggregate; file mode has no GitHub connection. */
@@ -774,6 +776,7 @@ export class LocalFileStore implements FeatureStore {
       description: p.description,
       visibility: p.visibility,
       position: p.position,
+      color: p.color ?? null,
       itemCount: counts.get(p.id) ?? 0,
       viewerRole: null,
     };
@@ -813,6 +816,7 @@ export class LocalFileStore implements FeatureStore {
       name,
       description: input.description ?? null,
       visibility: input.visibility ?? "org",
+      color: input.color ?? null,
       position: products.reduce((m, p) => Math.max(m, p.position), -1) + 1,
     };
     await this.writeProducts([...products, product]);
@@ -835,6 +839,7 @@ export class LocalFileStore implements FeatureStore {
     if (patch.description !== undefined) p.description = patch.description;
     if (patch.visibility !== undefined) p.visibility = patch.visibility;
     if (patch.position !== undefined) p.position = patch.position;
+    if (patch.color !== undefined) p.color = patch.color;
     await this.writeProducts(products);
     return this.toProductRecord(p, await this.productItemCounts());
   }

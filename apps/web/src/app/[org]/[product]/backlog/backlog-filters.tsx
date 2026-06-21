@@ -17,6 +17,8 @@ export interface FilterOptions {
   tags: string[];
   epics: { specId: string; title: string }[];
   priorities: number[];
+  /** Products to filter by; provided only in the cross-product view. */
+  products?: { id: string; name: string }[];
 }
 
 /**
@@ -56,6 +58,22 @@ export function BacklogFilters({
 
   return (
     <div className="flex flex-wrap items-center gap-2" data-pending={pending}>
+      {options.products && options.products.length > 0 ? (
+        <Select
+          aria-label="Filter by product"
+          className="h-8 w-auto"
+          value={filters.product ?? ""}
+          onChange={(e) => set("product", e.target.value || undefined)}
+        >
+          <option value="">Any product</option>
+          {options.products.map((p) => (
+            <option key={p.id} value={p.id}>
+              {p.name}
+            </option>
+          ))}
+        </Select>
+      ) : null}
+
       <Select
         aria-label="Filter by status"
         className="h-8 w-auto"

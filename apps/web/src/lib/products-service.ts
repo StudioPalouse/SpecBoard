@@ -1,4 +1,4 @@
-import { canManageProduct, type ProductAccess } from "@specboard/core";
+import { canManageProduct, PRODUCT_COLORS, type ProductAccess } from "@specboard/core";
 
 import { InvalidPatchError } from "@/lib/features-service";
 import {
@@ -22,6 +22,16 @@ import {
 
 const VISIBILITIES: readonly ProductVisibility[] = ["org", "private"];
 const PRODUCT_ROLES: readonly ProductRole[] = ["admin", "editor", "viewer"];
+const COLORS: readonly string[] = PRODUCT_COLORS;
+
+/** Validate an optional `color`: a known palette token, or null to clear it. */
+function parseColor(raw: Record<string, unknown>): string | null {
+  if (raw.color === null) return null;
+  if (typeof raw.color !== "string" || !COLORS.includes(raw.color)) {
+    throw new InvalidPatchError(`color must be one of: ${COLORS.join(", ")}.`);
+  }
+  return raw.color;
+}
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 function isUuid(value: unknown): value is string {
@@ -73,6 +83,7 @@ export function parseCreateProductInput(body: unknown): CreateProductInput {
     }
     input.visibility = raw.visibility as ProductVisibility;
   }
+  if ("color" in raw) input.color = parseColor(raw);
   return input;
 }
 
@@ -115,9 +126,10 @@ export function parseProductPatch(body: unknown): ProductPatch {
     }
     patch.position = raw.position;
   }
+  if ("color" in raw) patch.color = parseColor(raw);
   if (Object.keys(patch).length === 0) {
     throw new InvalidPatchError(
-      "Patch must set at least one of: name, description, visibility, position.",
+      "Patch must set at least one of: name, description, visibility, position, color.",
     );
   }
   return patch;

@@ -4,6 +4,8 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
 
+import { PRODUCT_COLORS, type ProductColor } from "@specboard/core";
+
 import { ProductMembers } from "@/components/product-members";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -22,9 +24,54 @@ import {
   deleteProduct,
   updateProduct,
 } from "@/lib/api-client";
+import { colorDot, productColorClasses } from "@/lib/product-color";
 import type { ProductRecord, ProductVisibility } from "@/lib/store/types";
+import { cn } from "@/lib/utils";
 
 type Member = { userId: string; name: string; email: string };
+
+/**
+ * Pick a product accent color. `null` ("Auto") derives a stable color from the
+ * product key; the rest set an explicit palette token.
+ */
+function ColorPicker({
+  value,
+  onChange,
+}: {
+  value: string | null;
+  onChange: (color: string | null) => void;
+}) {
+  return (
+    <div className="flex flex-wrap items-center gap-1.5">
+      <button
+        type="button"
+        onClick={() => onChange(null)}
+        aria-label="Auto color"
+        aria-pressed={value === null}
+        className={cn(
+          "h-6 rounded-full border px-2 text-[11px] text-muted-foreground transition",
+          value === null && "ring-2 ring-ring ring-offset-1 ring-offset-background",
+        )}
+      >
+        Auto
+      </button>
+      {PRODUCT_COLORS.map((c: ProductColor) => (
+        <button
+          key={c}
+          type="button"
+          onClick={() => onChange(c)}
+          aria-label={c}
+          aria-pressed={value === c}
+          className={cn(
+            "h-6 w-6 rounded-full transition",
+            colorDot(c),
+            value === c && "ring-2 ring-ring ring-offset-1 ring-offset-background",
+          )}
+        />
+      ))}
+    </div>
+  );
+}
 
 /**
  * Manage the org's products: create new ones, rename / re-describe / change a
@@ -112,6 +159,7 @@ function ProductCard({
   const router = useRouter();
   const [editing, setEditing] = useState(false);
   const [showMembers, setShowMembers] = useState(false);
+  const [color, setColor] = useState<string | null>(product.color);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
@@ -131,6 +179,7 @@ function ProductCard({
       name,
       description: String(data.get("description") ?? "").trim() || null,
       visibility: String(data.get("visibility")) as ProductVisibility,
+      color,
     };
     startTransition(async () => {
       setError(null);
@@ -193,6 +242,10 @@ function ProductCard({
               <option value="private">{VISIBILITY_LABEL.private}</option>
             </Select>
           </label>
+          <div className="space-y-1.5">
+            <span className="text-xs font-medium text-muted-foreground">Color</span>
+            <ColorPicker value={color} onChange={setColor} />
+          </div>
           {error ? <p className="text-xs text-destructive">{error}</p> : null}
           <div className="flex gap-2">
             <Button type="submit" size="sm" disabled={pending}>
@@ -214,6 +267,10 @@ function ProductCard({
       ) : (
         <div className="space-y-2">
           <div className="flex items-center gap-2">
+            <span
+              className={cn("h-2.5 w-2.5 shrink-0 rounded-full", productColorClasses(product).dot)}
+              aria-hidden
+            />
             <span className="font-medium">{product.name}</span>
             {product.visibility === "private" ? (
               <Badge variant="outline" className="text-[10px]">
@@ -285,6 +342,7 @@ function CreateProductSheet({
   onCreated: (p: ProductRecord) => void;
 }) {
   const router = useRouter();
+  const [color, setColor] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
@@ -300,6 +358,7 @@ function CreateProductSheet({
       name,
       description: String(data.get("description") ?? "").trim() || null,
       visibility: String(data.get("visibility")) as ProductVisibility,
+      color,
     };
     startTransition(async () => {
       setError(null);
@@ -344,6 +403,10 @@ function CreateProductSheet({
               <option value="private">{VISIBILITY_LABEL.private}</option>
             </Select>
           </label>
+          <div className="space-y-1.5">
+            <span className="text-xs font-medium text-muted-foreground">Color</span>
+            <ColorPicker value={color} onChange={setColor} />
+          </div>
           {error ? <p className="text-xs text-destructive">{error}</p> : null}
           <Button type="submit" size="sm" disabled={pending}>
             {pending ? "Creating…" : "Create product"}

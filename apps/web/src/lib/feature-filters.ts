@@ -11,6 +11,8 @@ export interface FeatureFilters {
   priority?: number;
   tag?: string;
   parent?: string;
+  /** Owning product id; only meaningful in the cross-product view. */
+  product?: string;
 }
 
 /** The query keys we read/write — also the order the filter bar renders them. */
@@ -20,6 +22,7 @@ export const FILTER_KEYS = [
   "priority",
   "tag",
   "parent",
+  "product",
 ] as const;
 
 type RawParams = Record<string, string | string[] | undefined>;
@@ -45,6 +48,8 @@ export function parseFeatureFilters(params: RawParams): FeatureFilters {
   if (tag) filters.tag = tag;
   const parent = first(params.parent);
   if (parent) filters.parent = parent;
+  const product = first(params.product);
+  if (product) filters.product = product;
   return filters;
 }
 
@@ -77,6 +82,7 @@ export function applyFeatureFilters(
         return false;
       }
     }
+    if (filters.product && f.productId !== filters.product) return false;
     return true;
   });
 }

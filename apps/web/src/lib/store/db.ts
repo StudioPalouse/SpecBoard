@@ -1040,6 +1040,7 @@ export class DbStore implements FeatureStore {
           description: p.description,
           visibility: p.visibility,
           position: p.position,
+          color: p.color,
           itemCount: counts.get(p.id) ?? 0,
           viewerRole: access.roles.get(p.id) ?? null,
         }));
@@ -1066,6 +1067,7 @@ export class DbStore implements FeatureStore {
         description: row.description,
         visibility: row.visibility,
         position: row.position,
+        color: row.color,
         itemCount: counts.get(row.id) ?? 0,
         viewerRole: access.roles.get(row.id) ?? null,
       };
@@ -1101,6 +1103,7 @@ export class DbStore implements FeatureStore {
           name,
           description: input.description ?? null,
           visibility: input.visibility ?? "org",
+          color: input.color ?? null,
           position: Number(max[0]?.m ?? -1) + 1,
         })
         .returning();
@@ -1112,6 +1115,7 @@ export class DbStore implements FeatureStore {
         description: row.description,
         visibility: row.visibility,
         position: row.position,
+        color: row.color,
         itemCount: 0,
         viewerRole: null,
       };
@@ -1134,6 +1138,7 @@ export class DbStore implements FeatureStore {
       if (patch.description !== undefined) set.description = patch.description;
       if (patch.visibility !== undefined) set.visibility = patch.visibility;
       if (patch.position !== undefined) set.position = patch.position;
+      if (patch.color !== undefined) set.color = patch.color;
       const [row] = await tx
         .update(products)
         .set(set)
@@ -1149,6 +1154,7 @@ export class DbStore implements FeatureStore {
         description: row.description,
         visibility: row.visibility,
         position: row.position,
+        color: row.color,
         itemCount: counts.get(row.id) ?? 0,
         viewerRole: access.roles.get(row.id) ?? null,
       };

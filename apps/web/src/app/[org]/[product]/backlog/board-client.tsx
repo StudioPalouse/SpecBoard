@@ -23,7 +23,7 @@ import { toast } from "sonner";
 
 import type { EstimateConfig, RepoConfig, StatusWorkflow } from "@specboard/core";
 
-import { FeatureCard } from "@/components/feature-card";
+import { FeatureCard, type ProductTag } from "@/components/feature-card";
 import { FeatureEditSheet } from "@/components/feature-edit-sheet";
 import { StatusDot } from "@/components/status-dot";
 import { AuthRequiredError, patchFeature } from "@/lib/api-client";
@@ -59,6 +59,7 @@ export function BoardClient({
   members,
   customFields,
   estimate,
+  productsById,
 }: {
   features: FeatureRecord[];
   /** Items one level up — valid parents for the cards on this board. */
@@ -73,6 +74,9 @@ export function BoardClient({
   members: WorkspaceMember[];
   customFields: FieldDef[];
   estimate: EstimateConfig;
+  /** Product identity by id, for the per-card attribution badge in the
+   * cross-product view. Omitted when the board is scoped to one product. */
+  productsById?: Record<string, ProductTag>;
 }) {
   const router = useRouter();
   const [records, setRecords] = useState<Record<string, FeatureRecord>>(() =>
@@ -193,6 +197,7 @@ export function BoardClient({
               workflow={workflow}
               canEdit={canEdit}
               onOpen={setEditingSpecId}
+              productsById={productsById}
             />
           ))}
         </div>
@@ -207,6 +212,11 @@ export function BoardClient({
               workflow={workflow}
               canEdit={false}
               onOpen={() => {}}
+              product={
+                activeRecord.productId
+                  ? productsById?.[activeRecord.productId]
+                  : undefined
+              }
             />
           ) : null}
         </DragOverlay>
@@ -236,6 +246,7 @@ function Column({
   workflow,
   canEdit,
   onOpen,
+  productsById,
 }: {
   status: string;
   cardIds: string[];
@@ -247,6 +258,7 @@ function Column({
   workflow: StatusWorkflow;
   canEdit: boolean;
   onOpen: (specId: string) => void;
+  productsById?: Record<string, ProductTag>;
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: `${COL_PREFIX}${status}` });
   return (
@@ -277,6 +289,9 @@ function Column({
                   workflow={workflow}
                   canEdit={canEdit}
                   onOpen={() => onOpen(id)}
+                  product={
+                    record.productId ? productsById?.[record.productId] : undefined
+                  }
                 />
               </SortableCard>
             );
