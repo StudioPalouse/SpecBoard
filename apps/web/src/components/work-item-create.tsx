@@ -27,19 +27,36 @@ export function WorkItemCreate({
   parentLabel,
   parents,
   productId,
+  products,
 }: {
   levelKey: string;
   levelLabel: string;
   /** Label of the parent level (e.g. "Initiative"), or null when top-level. */
   parentLabel: string | null;
-  parents: { specId: string; title: string }[];
+  parents: { specId: string; title: string; productId?: string | null }[];
   /** Product the new item belongs to; null defers to the default product. */
   productId?: string | null;
+  /** Products to choose from in the cross-product ("All products") view, where
+   * no single product is in context. Omitted/empty when scoped to a product. */
+  products?: { id: string; name: string }[];
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+
+  // Offer a product picker only when no product is in context (all-products
+  // view) and there's more than one to choose between.
+  const showProductPicker = !productId && (products?.length ?? 0) > 1;
+  const [selectedProduct, setSelectedProduct] = useState(
+    () => productId ?? products?.[0]?.id ?? null,
+  );
+
+  // In the picker, only parents in the chosen product are valid (the server
+  // doesn't cross-check, so filtering here keeps the hierarchy single-product).
+  const visibleParents = showProductPicker
+    ? parents.filter((p) => p.productId === selectedProduct)
+    : parents;
 
   function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -50,10 +67,16 @@ export function WorkItemCreate({
       return;
     }
     const parentSpecId = String(data.get("parentSpecId") ?? "") || null;
+    const chosenProductId = showProductPicker ? selectedProduct : productId;
     startTransition(async () => {
       setError(null);
       try {
-        await createWorkItem({ title, level: levelKey, parentSpecId, productId });
+        await createWorkItem({
+          title,
+          level: levelKey,
+          parentSpecId,
+          productId: chosenProductId,
+        });
         toast.success(`${levelLabel} created`);
         setOpen(false);
         router.refresh();
@@ -86,14 +109,38 @@ export function WorkItemCreate({
               </span>
               <Input name="title" autoFocus className="h-8" />
             </label>
+            {showProductPicker ? (
+              <label className="block space-y-1.5">
+                <span className="text-xs font-medium text-muted-foreground">
+                  Product
+                </span>
+                <Select
+                  value={selectedProduct ?? ""}
+                  onChange={(e) => setSelectedProduct(e.target.value || null)}
+                  className="h-8"
+                >
+                  {products!.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.name}
+                    </option>
+                  ))}
+                </Select>
+              </label>
+            ) : null}
             {parentLabel ? (
               <label className="block space-y-1.5">
                 <span className="text-xs font-medium text-muted-foreground">
                   Parent ({parentLabel.toLowerCase()})
                 </span>
-                <Select name="parentSpecId" defaultValue="" className="h-8">
+                {/* Remount on product change so a now-invalid parent resets. */}
+                <Select
+                  key={selectedProduct ?? "all"}
+                  name="parentSpecId"
+                  defaultValue=""
+                  className="h-8"
+                >
                   <option value="">None</option>
-                  {parents.map((p) => (
+                  {visibleParents.map((p) => (
                     <option key={p.specId} value={p.specId}>
                       {p.title}
                     </option>

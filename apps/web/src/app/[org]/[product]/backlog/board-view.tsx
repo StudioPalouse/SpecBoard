@@ -68,7 +68,7 @@ export async function BoardView({
   const parents = parentKey
     ? scoped
         .filter((f) => f.level === parentKey)
-        .map((f) => ({ specId: f.specId, title: f.title }))
+        .map((f) => ({ specId: f.specId, title: f.title, productId: f.productId }))
     : [];
   const parentLabel =
     levels.find((l) => l.key === parentKey)?.label ?? null;
@@ -100,6 +100,7 @@ export async function BoardView({
               parentLabel={parentLabel}
               parents={parents}
               productId={activeProduct?.id ?? null}
+              products={products.map((p) => ({ id: p.id, name: p.name }))}
             />
           ) : null}
           {features.length > 0 && canEdit ? (
