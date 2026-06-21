@@ -129,6 +129,25 @@ Nothing to copy by hand.
   **Recent Deliveries** should show the push delivery returning **200**, and the
   board reflects the change.
 
+## 4. Disconnecting a repository
+
+On the Repositories page each connected repo has a **Disconnect** button (admin
+only) next to **Re-sync**; it asks for an inline confirm before acting.
+
+Disconnect **detaches, it does not delete your board.** The imported work items
+stay on the board as standalone rows — the `features.repo_id` FK is `ON DELETE
+set null` (migration `0016`), so removing the `repositories` row nulls their
+`repo_id` rather than cascading. What *is* removed: the sync connection itself and
+the repo's `feature_github_links` (PR/issue links, a `NOT NULL` FK — they can't
+refresh without the install). The GitHub App **installation** on GitHub is left
+alone; uninstall it there separately if you also want to revoke access.
+
+Under the hood: `DELETE /api/v1/repositories/:id` (admin-only, workspace-scoped).
+Reconnecting later re-imports and re-homes items by their stable key, so a
+disconnect → reconnect round-trip is non-destructive. To connect a different
+GitHub org, just install the App there and connect — repositories are listed
+per-row, so multiple repos across multiple orgs coexist in one workspace.
+
 ## Troubleshooting
 
 - **Delivery 401 (Invalid signature):** `GITHUB_WEBHOOK_SECRET` doesn't match the

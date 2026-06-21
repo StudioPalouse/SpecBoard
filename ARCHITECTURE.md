@@ -72,7 +72,9 @@ Next.js web app  ── apps/web           MCP server ── apps/mcp
   Feature → Work Item, where only the leaf is spec-backed), `features` (with a
   self-referential `parent_id` for the work hierarchy,
   a `level` column composite-FK'd to `workspace_levels`, a nullable `repo_id` for
-  DB-native items above the leaf, and a fractional `rank` for manual board ordering),
+  DB-native items above the leaf — also `ON DELETE set null`, so disconnecting a
+  repo detaches its imported items instead of deleting them — and a fractional
+  `rank` for manual board ordering),
   `feature_links` (typed dependencies/relations between features),
   `feature_github_links` (links a feature to a GitHub PR/issue/branch with cached
   state), `spec_index`, `comments`, `activity_log`, `saved_views` (per-user backlog
@@ -100,6 +102,10 @@ Next.js web app  ── apps/web           MCP server ── apps/mcp
    Each spec's work item is homed under a Feature grouping — found or created by a
    stable key (the spec's `feature:` frontmatter, else its folder), so the hierarchy
    fills in on import without overriding any parent set later in the app (ADR 0002).
+   Multiple repos (across multiple GitHub orgs) coexist in one workspace — one
+   `repositories` row each. An admin can **disconnect** a repo
+   (`DELETE /api/v1/repositories/:id`): the connection and the repo's GitHub links
+   are removed, but imported items detach (`repo_id` → NULL) rather than delete.
 2. **Reconcile on push** — `push` webhook → re-parse changed specs → update `spec_index`;
    `blob_sha` detects drift/conflicts. The same webhook handles `pull_request`/`issues`
    events to refresh the cached state of any `feature_github_links` (open → merged/closed).
