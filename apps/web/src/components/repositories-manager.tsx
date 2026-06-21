@@ -5,6 +5,7 @@ import { useCallback, useEffect, useState, useTransition } from "react";
 
 import {
   connectRepository,
+  disconnectRepository,
   listInstallationRepositories,
   type InstallationRepo,
   type SyncResult,
@@ -84,7 +85,7 @@ export function RepositoriesManager({
         </p>
       ) : null}
 
-      <RepoList repos={repos} canResync={canConnect && configured} />
+      <RepoList repos={repos} canResync={canConnect && configured} canManage={canConnect} />
 
       {!canConnect ? (
         <p className="text-sm text-muted-foreground">
@@ -155,7 +156,15 @@ function HostedNotConfiguredCard() {
   );
 }
 
-function RepoList({ repos, canResync }: { repos: ConnectedRepo[]; canResync: boolean }) {
+function RepoList({
+  repos,
+  canResync,
+  canManage,
+}: {
+  repos: ConnectedRepo[];
+  canResync: boolean;
+  canManage: boolean;
+}) {
   if (repos.length === 0) {
     return (
       <Card>
@@ -168,16 +177,25 @@ function RepoList({ repos, canResync }: { repos: ConnectedRepo[]; canResync: boo
   return (
     <div className="space-y-3">
       {repos.map((repo) => (
-        <RepoRow key={repo.id} repo={repo} canResync={canResync} />
+        <RepoRow key={repo.id} repo={repo} canResync={canResync} canManage={canManage} />
       ))}
     </div>
   );
 }
 
-function RepoRow({ repo, canResync }: { repo: ConnectedRepo; canResync: boolean }) {
+function RepoRow({
+  repo,
+  canResync,
+  canManage,
+}: {
+  repo: ConnectedRepo;
+  canResync: boolean;
+  canManage: boolean;
+}) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [status, setStatus] = useState<Status>(null);
+  const [confirming, setConfirming] = useState(false);
 
   function resync() {
     startTransition(async () => {
@@ -193,6 +211,22 @@ function RepoRow({ repo, canResync }: { repo: ConnectedRepo; canResync: boolean 
         router.refresh();
       } catch (err) {
         setStatus({ kind: "error", message: err instanceof Error ? err.message : "Re-sync failed." });
+      }
+    });
+  }
+
+  function disconnect() {
+    startTransition(async () => {
+      setStatus(null);
+      try {
+        await disconnectRepository(repo.id);
+        router.refresh();
+      } catch (err) {
+        setConfirming(false);
+        setStatus({
+          kind: "error",
+          message: err instanceof Error ? err.message : "Disconnect failed.",
+        });
       }
     });
   }
@@ -216,11 +250,44 @@ function RepoRow({ repo, canResync }: { repo: ConnectedRepo; canResync: boolean 
             ) : null}
           </p>
         </div>
-        {canResync ? (
-          <Button size="sm" variant="outline" onClick={resync} disabled={pending}>
-            {pending ? "…" : "Re-sync"}
-          </Button>
-        ) : null}
+        <div className="flex shrink-0 items-center gap-2">
+          {confirming ? (
+            <>
+              <span className="text-xs text-muted-foreground">
+                Stop syncing? Imported items stay on the board.
+              </span>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => setConfirming(false)}
+                disabled={pending}
+              >
+                Cancel
+              </Button>
+              <Button size="sm" variant="destructive" onClick={disconnect} disabled={pending}>
+                {pending ? "…" : "Disconnect"}
+              </Button>
+            </>
+          ) : (
+            <>
+              {canResync ? (
+                <Button size="sm" variant="outline" onClick={resync} disabled={pending}>
+                  {pending ? "…" : "Re-sync"}
+                </Button>
+              ) : null}
+              {canManage ? (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => setConfirming(true)}
+                  disabled={pending}
+                >
+                  Disconnect
+                </Button>
+              ) : null}
+            </>
+          )}
+        </div>
       </CardContent>
     </Card>
   );

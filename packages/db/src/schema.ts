@@ -190,10 +190,12 @@ export const features = pgTable(
       .references(() => workspaces.id, { onDelete: "cascade" }),
     /**
      * Source repository, or NULL for DB-native items (initiatives/epics) that
-     * live above the spec leaf and have no git backing.
+     * live above the spec leaf and have no git backing. `set null` on delete so
+     * disconnecting a repo detaches its imported items (they stay on the board
+     * as standalone rows) rather than deleting the user's board content.
      */
     repoId: uuid("repo_id").references(() => repositories.id, {
-      onDelete: "cascade",
+      onDelete: "set null",
     }),
     /**
      * Owning product (sibling backlog). Nullable for legacy/unassigned rows;

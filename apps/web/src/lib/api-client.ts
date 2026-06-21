@@ -334,6 +334,21 @@ export async function connectRepository(
   return { sync: body?.sync ?? { error: "No sync summary returned." } };
 }
 
+/**
+ * Disconnect a connected repository. Imported board items are kept (detached);
+ * only the sync connection and its GitHub links are removed. Admin-only.
+ */
+export async function disconnectRepository(id: string): Promise<void> {
+  const res = await fetch(`/api/v1/repositories/${encodeURIComponent(id)}`, {
+    method: "DELETE",
+  });
+  if (res.status === 401) throw new AuthRequiredError();
+  if (!res.ok) {
+    const body = (await res.json().catch(() => null)) as { error?: string } | null;
+    throw new Error(body?.error ?? `Disconnect failed with ${res.status}`);
+  }
+}
+
 /** A repository the pending GitHub App installation can access. */
 export interface InstallationRepo {
   owner: string;
