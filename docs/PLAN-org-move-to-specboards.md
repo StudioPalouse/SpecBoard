@@ -1,14 +1,14 @@
 # Plan — Move the repo to the `Specboards` GitHub org
 
 - **Status:** Ready to execute
-- **Scope:** Transfer `StudioPalouse/SpecBoard` → `Specboards/SpecBoard`, fix
+- **Scope:** Transfer `StudioPalouse/Specboard` → `Specboards/SpecBoard`, fix
   everything that references the old org, and register the hosted GitHub Apps
   under `Specboards`.
 - **You do:** the actual repo transfer (GitHub UI). **This doc:** every update
   needed afterward + the prod App registration.
 
-> Why `Specboards` (with the "s"): the bare name **`SpecBoard` is permanently
-> reserved** to a foreign `@SpecBoard` GitHub org (created 2025-03-19, not one we
+> Why `Specboards` (with the "s"): the bare name **`Specboard` is permanently
+> reserved** to a foreign `@Specboard` GitHub org (created 2025-03-19, not one we
 > belong to). Verified via the API — there is no path to claim it. `Specboards`
 > is the org we control; `specboards` is free as an App slug.
 
@@ -18,7 +18,7 @@
 
 **Carries automatically:** code, branches, tags, issues, PRs, milestones,
 labels, releases, stars/watchers, and **URL redirects** (old
-`StudioPalouse/SpecBoard` links and `git remote` keep working via redirect).
+`StudioPalouse/Specboard` links and `git remote` keep working via redirect).
 
 **Does NOT carry — must be redone in the new location:**
 - **Actions secrets & variables** (incl. `FLY_API_TOKEN_TEST` /
@@ -42,7 +42,7 @@ labels, releases, stars/watchers, and **URL redirects** (old
       `fly tokens create deploy -a specboard-marketing`
       (or reuse the existing token values if you still have them).
 - [ ] Note the current test repo connection (for restoring it):
-      owner `StudioPalouse`, name `SpecBoard`, branch `main`,
+      owner `StudioPalouse`, name `Specboard`, branch `main`,
       installation_id `140279350`, workspace `palouse`.
 - [ ] Merge or note any open PRs/branches (they survive the transfer, but it's
       cleaner to land in-flight work first).
@@ -51,8 +51,8 @@ labels, releases, stars/watchers, and **URL redirects** (old
 
 ## 2. The move (you, in GitHub UI)
 
-1. `StudioPalouse/SpecBoard` → **Settings → General → Danger Zone → Transfer
-   ownership** → new owner **`Specboards`**, repo name **`SpecBoard`**.
+1. `StudioPalouse/Specboard` → **Settings → General → Danger Zone → Transfer
+   ownership** → new owner **`Specboards`**, repo name **`Specboard`**.
 2. Confirm. The repo is now **`Specboards/SpecBoard`**.
 
 ---
@@ -105,7 +105,7 @@ Easiest path that also serves multi-tenant install (one shared test App):
 Reconnecting through the app UI is cleanest: on
 `test.specboard.ai/palouse/settings/repositories`, the install redirect lands on
 the repo picker — **Connect** `Specboards/SpecBoard` (it upserts owner +
-installation_id and re-imports). Then remove the stale `StudioPalouse/SpecBoard`
+installation_id and re-imports). Then remove the stale `StudioPalouse/Specboard`
 row if one lingers.
 
 If you'd rather do it directly (proxy via `fly proxy 15432:5432 -a specboard-test-db`, then `psql` as `specboard_owner`):
@@ -114,7 +114,7 @@ If you'd rather do it directly (proxy via `fly proxy 15432:5432 -a specboard-tes
 -- installation URL). Replace <NEW_INSTALL_ID>.
 update repositories
    set owner = 'Specboards', github_installation_id = '<NEW_INSTALL_ID>'
- where owner = 'StudioPalouse' and name = 'SpecBoard';
+ where owner = 'StudioPalouse' and name = 'Specboard';
 ```
 Verify a push to `Specboards/SpecBoard` `main` shows a **200** delivery (App →
 Advanced → Recent Deliveries) and the board reflects the change.
@@ -136,7 +136,7 @@ openssl rand -hex 32
 
 | Field | Value |
 | --- | --- |
-| **GitHub App name** | `SpecBoards` (slug becomes `specboards` — confirmed free) |
+| **GitHub App name** | `Specboards` (slug becomes `specboards` — confirmed free) |
 | **Homepage URL** | `https://app.specboard.ai` |
 | **Callback URL** | `https://app.specboard.ai/api/v1/github/app/callback` |
 | **Setup URL** | `https://app.specboard.ai/api/v1/github/setup` — tick **Redirect on update** |
@@ -177,11 +177,11 @@ references as of the move:
 | File | Change |
 | --- | --- |
 | `apps/marketing/src/lib/site.ts:10` | `GITHUB_URL` default → `https://github.com/Specboards/SpecBoard` (or set `NEXT_PUBLIC_GITHUB_URL` at marketing build) |
-| `apps/marketing/src/components/site-footer.tsx:22` | footer link text `StudioPalouse/SpecBoard` → `Specboards/SpecBoard` |
+| `apps/marketing/src/components/site-footer.tsx:22` | footer link text `StudioPalouse/Specboard` → `Specboards/SpecBoard` |
 | `docs/RUNBOOK-marketing-site.md:55` | update the `NEXT_PUBLIC_GITHUB_URL` default note |
 | `docs/RUNBOOK-github-sync.md` (~L81, L161) | example owner `StudioPalouse` → `Specboards` |
 | `apps/web/src/components/repositories-manager.tsx:463` | manual-connect owner placeholder `StudioPalouse` → `Specboards` (cosmetic) |
-| `docs/BACKLOG.md` | issue links `github.com/StudioPalouse/SpecBoard/...` — optional; old links auto-redirect |
+| `docs/BACKLOG.md` | issue links `github.com/StudioPalouse/Specboard/...` — optional; old links auto-redirect |
 
 Leave as-is (not org references): `packages/core/src/email-domains.test.ts`
 (`studiopalouse.com` is just a non-consumer-domain test fixture).

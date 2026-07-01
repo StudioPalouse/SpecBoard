@@ -92,7 +92,7 @@ export function ApiKeysCard({ initialKeys }: { initialKeys: ApiKeyView[] }) {
       <CardHeader>
         <CardTitle>API keys</CardTitle>
         <CardDescription>
-          Personal keys for the SpecBoard CLI and programmatic access. Each key acts
+          Personal keys for the Specboard CLI and programmatic access. Each key acts
           as you and inherits your workspace role. The full key is shown once, at
           creation. Send it as the <code>x-api-key</code> header.
         </CardDescription>

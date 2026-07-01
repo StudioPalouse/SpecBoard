@@ -39,14 +39,14 @@ function createAuth(url: string) {
       sendResetPassword: async ({ user, url }) => {
         const { textBody, htmlBody } = renderActionEmail({
           name: user.name,
-          intro: "We received a request to reset your SpecBoard password. Click the button below to choose a new one.",
+          intro: "We received a request to reset your Specboard password. Click the button below to choose a new one.",
           action: "Reset password",
           url,
           footer: "If you didn't request this, you can safely ignore this email.",
         });
         await sendEmail({
           to: user.email,
-          subject: "Reset your SpecBoard password",
+          subject: "Reset your Specboard password",
           textBody,
           htmlBody,
         });
@@ -75,14 +75,14 @@ function createAuth(url: string) {
         }) => {
           const { textBody, htmlBody } = renderActionEmail({
             name: user.name,
-            intro: `Confirm that you want to change your SpecBoard email address to ${newEmail}. The change takes effect once you click the button below.`,
+            intro: `Confirm that you want to change your Specboard email address to ${newEmail}. The change takes effect once you click the button below.`,
             action: "Confirm email change",
             url,
             footer: "If you didn't request this, you can safely ignore this email and your address stays the same.",
           });
           await sendEmail({
             to: user.email,
-            subject: "Confirm your SpecBoard email change",
+            subject: "Confirm your Specboard email change",
             textBody,
             htmlBody,
           });
@@ -100,13 +100,13 @@ function createAuth(url: string) {
       sendVerificationEmail: async ({ user, url }) => {
         const { textBody, htmlBody } = renderActionEmail({
           name: user.name,
-          intro: "Confirm your email address to finish setting up your SpecBoard account.",
+          intro: "Confirm your email address to finish setting up your Specboard account.",
           action: "Verify email",
           url,
         });
         await sendEmail({
           to: user.email,
-          subject: "Verify your SpecBoard email",
+          subject: "Verify your Specboard email",
           textBody,
           htmlBody,
         });

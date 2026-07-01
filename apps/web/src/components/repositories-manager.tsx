@@ -45,7 +45,7 @@ interface RepositoriesManagerProps {
   /** Whether the deployment has a GitHub App configured yet. */
   configured: boolean;
   /** Self-host (single-tenant) deployment: admins create their own GitHub App.
-   *  On hosted (multi-tenant), the App is shared and managed by SpecBoard. */
+   *  On hosted (multi-tenant), the App is shared and managed by Specboard. */
   selfHosted: boolean;
   /** GitHub App "install" URL once the App exists, else null. */
   installUrl: string | null;
@@ -80,7 +80,7 @@ export function RepositoriesManager({
       <div>
         <h1 className="text-lg font-semibold tracking-tight">Repositories</h1>
         <p className="text-sm text-muted-foreground">
-          SpecBoard imports <code>specs/**/spec.md</code> from connected repositories and keeps the
+          Specboard imports <code>specs/**/spec.md</code> from connected repositories and keeps the
           board in sync on every push.
         </p>
       </div>
@@ -107,7 +107,7 @@ export function RepositoriesManager({
         <p className="text-sm text-muted-foreground">
           {configured
             ? "Only an admin can connect repositories."
-            : "GitHub isn't set up yet. Ask an admin to connect SpecBoard to GitHub."}
+            : "GitHub isn't set up yet. Ask an admin to connect Specboard to GitHub."}
         </p>
       ) : configured ? (
         <ConnectSection installUrl={installUrl} connected={repos} onConnected={bumpScan} />
@@ -454,7 +454,7 @@ function EmptySpecsState({
 function CreateSpecRepoNudge({ installUrl }: { installUrl: string | null }) {
   const newRepoUrl =
     "https://github.com/new?name=specs&description=" +
-    encodeURIComponent("Product specs synced to SpecBoard");
+    encodeURIComponent("Product specs synced to Specboard");
   return (
     <details className="rounded-md border px-3 py-2">
       <summary className="cursor-pointer text-xs font-medium text-muted-foreground">
@@ -472,10 +472,10 @@ function CreateSpecRepoNudge({ installUrl }: { installUrl: string | null }) {
           <li>
             {installUrl ? (
               <a href={installUrl} target="_blank" rel="noreferrer" className="underline">
-                Install SpecBoard
+                Install Specboard
               </a>
             ) : (
-              "Install the SpecBoard GitHub App"
+              "Install the Specboard GitHub App"
             )}{" "}
             on the new repo.
           </li>
@@ -495,7 +495,7 @@ function SetupGitHubCard() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Connect SpecBoard to GitHub</CardTitle>
+        <CardTitle>Connect Specboard to GitHub</CardTitle>
         <CardDescription>
           We&apos;ll create a GitHub App on your account or organization in one click, and you
           confirm on GitHub. After that you can install it on repositories and sync specs.
@@ -521,7 +521,7 @@ function SetupGitHubCard() {
 
 /**
  * Hosted (multi-tenant) deployment with no GitHub App credentials configured.
- * Tenants don't create their own App here — it's a shared App SpecBoard owns —
+ * Tenants don't create their own App here — it's a shared App Specboard owns —
  * so the right action is to reach support, not run the manifest flow.
  */
 function HostedNotConfiguredCard() {
@@ -530,7 +530,7 @@ function HostedNotConfiguredCard() {
       <CardHeader>
         <CardTitle>GitHub isn&apos;t available yet</CardTitle>
         <CardDescription>
-          GitHub is managed by SpecBoard on the hosted plan. If you don&apos;t see the option to
+          GitHub is managed by Specboard on the hosted plan. If you don&apos;t see the option to
           install it, please contact support and we&apos;ll get you connected.
         </CardDescription>
       </CardHeader>
@@ -720,7 +720,7 @@ function ConnectSection({
       <CardHeader>
         <CardTitle>Connect a repository</CardTitle>
         <CardDescription>
-          Install the SpecBoard GitHub App on the repositories you want to sync, then connect them
+          Install the Specboard GitHub App on the repositories you want to sync, then connect them
           here. No copying ids by hand.
         </CardDescription>
       </CardHeader>
@@ -919,7 +919,7 @@ function ManualConnectForm() {
           </label>
           <label className="block space-y-1.5">
             <span className="text-xs font-medium text-muted-foreground">Repository</span>
-            <Input name="name" placeholder="SpecBoard" required />
+            <Input name="name" placeholder="Specboard" required />
           </label>
         </div>
         <div className="grid grid-cols-2 gap-3">

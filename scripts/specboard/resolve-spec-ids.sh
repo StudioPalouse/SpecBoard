@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Resolve the SpecBoard spec ids a change touches.
+# Resolve the Specboard spec ids a change touches.
 #
 # Usage: resolve-spec-ids.sh [BASE] [HEAD]
 #   BASE / HEAD default to origin/main and HEAD.

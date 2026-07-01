@@ -1,9 +1,9 @@
-# SpecBoard
+# Specboard
 
 A lightweight, spec-based product-management layer for **spec-driven development**.
 
 Your specs stay canonical in git (versioned with code, read by AI coding agents).
-SpecBoard layers the product metadata **on top** of them: status, assignment,
+Specboard layers the product metadata **on top** of them: status, assignment,
 priority, backlog order, roadmap, dependencies, and epic/sub-feature hierarchy.
 PM, UX, and engineering collaborate without editing files in a terminal and
 without duplicating work into JIRA/Aha.
@@ -44,7 +44,7 @@ Specs are **work items** (the spec-backed leaf of the hierarchy). They live unde
 
 ```yaml
 ---
-id: <uuid> # stable link to SpecBoard metadata (survives renames)
+id: <uuid> # stable link to Specboard metadata (survives renames)
 title: My Feature
 kind: feature
 feature: checkout # optional: groups this spec under a named Feature (else its folder is used)
@@ -121,7 +121,7 @@ docker compose -f infra/docker-compose.yml up   # web (infra/web.Dockerfile) + P
 
 ## License
 
-SpecBoard is **open-core**. The core product, which includes the web app,
+Specboard is **open-core**. The core product, which includes the web app,
 shared packages, MCP server, and single-org (`N=1`) self-hosting, is licensed
 under the [Apache License 2.0](./LICENSE). You may run, modify, and self-host it
 for any purpose, including commercially.
@@ -131,7 +131,7 @@ hosting (`N>1`), SSO/SAML/SCIM, advanced analytics, premium integrations, and
 audit logs. See [LICENSING.md](./LICENSING.md) for the full breakdown, or contact
 **contact@palouse.io** for a commercial license.
 
-The SpecBoard **brand** (name, logos, visual identity) and the marketing site
+The Specboard **brand** (name, logos, visual identity) and the marketing site
 are **not** open source. They live in the separate
 [Website](https://github.com/Specboards/Website) repo under a proprietary
 license. Apache-2.0 does not grant trademark rights; see

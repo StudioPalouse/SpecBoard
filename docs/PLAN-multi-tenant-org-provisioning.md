@@ -112,7 +112,7 @@ over. New hosted Apps were registered under `Specboards`:
 - test (`specboard-test`, db app `specboard-test-db`): 1 workspace `palouse`, 1 member.
   The old stored App `specboard-studiopalouse` (app_id 4052836, StudioPalouse)
   was deleted from `github_app` so env creds take over. The pre-existing repo row
-  (`StudioPalouse/SpecBoard`, installation 140279350) is stale and must be
+  (`StudioPalouse/Specboard`, installation 140279350) is stale and must be
   re-installed/reconnected against `specboards-test` (and re-pointed at the new
   `Specboards/SpecBoard` path). `SPECBOARD_MULTI_TENANT=true`.
 - prod (`specboard`, db app `specboard-prod-db`): 1 workspace `nintex`, 1 member, 0

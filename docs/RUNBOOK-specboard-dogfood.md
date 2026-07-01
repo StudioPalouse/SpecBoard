@@ -1,6 +1,6 @@
-# Runbook: SpecBoard for SpecBoard (dogfooding)
+# Runbook: Specboard for Specboard (dogfooding)
 
-We track SpecBoard's own development in SpecBoard, driven from the CLI so status
+We track Specboard's own development in Specboard, driven from the CLI so status
 follows the actual work instead of being updated by hand.
 
 ## The loop
@@ -24,7 +24,7 @@ Move specs through `defining` -> `ready` in the UI first if you want the
 
 ### 1. A bot user + API key
 
-Create (or reuse) a SpecBoard user for automation, sign in, and generate a key
+Create (or reuse) a Specboard user for automation, sign in, and generate a key
 under **Settings -> API keys**. Copy the `sb_…` value once.
 
 ### 2. Repo secrets (for CI)
@@ -62,5 +62,5 @@ git push`.
 ## Verify
 
 Open a PR that edits a `specs/**/spec.md` (or add a `Spec: <id>` trailer), then
-check the Action log under **SpecBoard Sync** and the item's status + linked PR
+check the Action log under **Specboard Sync** and the item's status + linked PR
 in the app. Start against `test.specboard.ai` before pointing CI at production.

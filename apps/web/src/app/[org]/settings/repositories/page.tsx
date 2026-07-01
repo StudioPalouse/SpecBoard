@@ -24,7 +24,7 @@ function noticeFor(params: Record<string, string | string[] | undefined>): Setup
     exchange: "GitHub couldn't finish creating the app. Please try again.",
     store: "Couldn't save the GitHub credentials. Please try again.",
     install: "The installation didn't complete. Please try again.",
-    hosted: "GitHub is managed by SpecBoard on the hosted plan. Just install the app below.",
+    hosted: "GitHub is managed by Specboard on the hosted plan. Just install the app below.",
   };
   const err = typeof params.error === "string" ? errors[params.error] : undefined;
   return err ? { kind: "error", message: err } : null;

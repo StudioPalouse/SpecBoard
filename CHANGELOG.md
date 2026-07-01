@@ -1,9 +1,32 @@
 # Changelog
 
-All notable changes to SpecBoard are recorded here. The format is based on
+All notable changes to Specboard are recorded here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project follows
 [Semantic Versioning](https://semver.org/). See [VERSIONING.md](./VERSIONING.md)
 for how and when the version is bumped.
+
+## [0.1.5] - 2026-07-01
+
+### Added
+
+- App branding from the new logo kit: favicon, apple touch icon, and social
+  preview (Open Graph) image, plus the icon mark in the sidebar header and on
+  the sign-in and sign-up cards.
+- First automated end-to-end tests: a Playwright suite covering the onboarding
+  spec flow (scan and import, guided first spec, dedicated-repo nudge), run in
+  CI on every pull request and now a required check on `main`.
+
+### Changed
+
+- Brand spelling unified to "Specboard" (previously "SpecBoard") across the UI,
+  docs, and emails.
+- Dependencies updated to latest compatible versions (better-auth 1.6.23,
+  Tailwind 4.3.2, lucide-react 1.23, vitest 3.2, turbo 2.10, prettier 3.9).
+  The vitest bump moves the transitive vite past two security advisories.
+
+### Fixed
+
+- Flaky end-to-end setup: signing in raced the app's own redirect to `/setup`.
 
 ## [0.1.4] - 2026-07-01
 

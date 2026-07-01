@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# SpecBoard pre-push hook (installed via scripts/specboard/install-hooks.sh).
+# Specboard pre-push hook (installed via scripts/specboard/install-hooks.sh).
 # When you push a feature branch, mark the specs it changed as in_progress.
 #
 # Strictly non-blocking: it no-ops unless the `specboard` CLI is installed and

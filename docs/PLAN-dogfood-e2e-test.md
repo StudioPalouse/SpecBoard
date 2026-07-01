@@ -1,6 +1,6 @@
 # Plan: end-to-end test of the dogfooding loop
 
-Goal: prove the full PR -> work-item-status loop against a real SpecBoard
+Goal: prove the full PR -> work-item-status loop against a real Specboard
 instance, end to end, then decide whether to roll it out more widely. This doc
 is a self-contained handoff: a fresh session should be able to run the test from
 here without prior context.
@@ -28,7 +28,7 @@ workflow. That is what this test does.
 ## The one rule that makes or breaks the test
 
 **The repo the CI workflow runs in must be the same repo whose specs were
-imported into the target SpecBoard workspace.** The workflow resolves spec ids
+imported into the target Specboard workspace.** The workflow resolves spec ids
 from `specs/**/spec.md` frontmatter `id:` in its own checkout, then calls the
 API. Those ids only resolve if that workspace imported those exact specs. Cross
 a repo/workspace boundary and every call 404s and is silently skipped (a no-op).
@@ -42,10 +42,10 @@ the `Nintex` workspace, which does not track that repo.
 
 | Thing | Value |
 | --- | --- |
-| SpecBoard deployment | `https://app.specboard.ai` (prod) |
-| SpecBoard workspace | "Nintex" in the app (slug `nintex`); admin `jonathan.butler@nintex.com`. Referred to loosely as the "Palouse" instance. |
+| Specboard deployment | `https://app.specboard.ai` (prod) |
+| Specboard workspace | "Nintex" in the app (slug `nintex`); admin `jonathan.butler@nintex.com`. Referred to loosely as the "Palouse" instance. |
 | GitHub org for the repo | `StudioPalouse` (https://github.com/StudioPalouse) |
-| Repo to connect + run CI in | a repo in `StudioPalouse` that is a copy of SpecBoard, so it already contains `apps/cli`, `scripts/specboard/`, `.github/workflows/specboard-sync.yml`, and `specs/**/spec.md`. Name it here: `__________` |
+| Repo to connect + run CI in | a repo in `StudioPalouse` that is a copy of Specboard, so it already contains `apps/cli`, `scripts/specboard/`, `.github/workflows/specboard-sync.yml`, and `specs/**/spec.md`. Name it here: `__________` |
 | API key | a key for the `nintex` workspace (admin). Already set as the `SPECBOARD_TOKEN` secret on `Specboards/SpecBoard`; for this test set it on the test repo instead (see step 4). |
 
 > Naming note: the app workspace is "Nintex" (slug `nintex`); the GitHub org is
@@ -66,7 +66,7 @@ the `Nintex` workspace, which does not track that repo.
 ## Steps
 
 ### 1. Pick / create the test repo in StudioPalouse
-Use a SpecBoard copy in `StudioPalouse` so CI-repo == connected-repo. It must
+Use a Specboard copy in `StudioPalouse` so CI-repo == connected-repo. It must
 contain the CLI, the scripts, the workflow, and `specs/**/spec.md`. If it is a
 fork of `Specboards/SpecBoard`, it already does.
 
@@ -74,8 +74,8 @@ fork of `Specboards/SpecBoard`, it already does.
 The GitHub-App connect flow authenticates off a signed-cookie install session,
 not API keys, so it must be done in the UI. In `app.specboard.ai` as the
 `nintex` admin -> **Settings -> Repositories -> Connect**:
-1. Install / authorize the SpecBoard GitHub App on the `StudioPalouse` org.
-2. Select the test repo. SpecBoard imports its `specs/**/spec.md` as work items,
+1. Install / authorize the Specboard GitHub App on the `StudioPalouse` org.
+2. Select the test repo. Specboard imports its `specs/**/spec.md` as work items,
    keyed by each spec's frontmatter `id`.
 
 ### 3. Verify the import via CLI (this is the go/no-go gate)
@@ -98,7 +98,7 @@ printf '%s' "https://app.specboard.ai" | gh secret set SPECBOARD_URL --repo Stud
 - Branch off, edit a tracked `specs/<dir>/spec.md` (a comment is enough), open a
   PR with `gh pr create`. For a code-only change, add a `Spec: <id>` trailer to
   the PR body instead.
-- The **SpecBoard Sync** action runs: it sets each touched spec `in_progress`
+- The **Specboard Sync** action runs: it sets each touched spec `in_progress`
   and links the PR. Watch with `gh run watch` and confirm in the app.
 - Merge the PR; the action sets those specs `done`.
 

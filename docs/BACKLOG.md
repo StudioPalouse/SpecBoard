@@ -1,16 +1,16 @@
 # Product Management Backlog: Table Stakes
 
-This backlog captures the product-management features SpecBoard needs to flush out its
+This backlog captures the product-management features Specboard needs to flush out its
 **core use case**: PM / UX / Eng collaborating to **prioritize and define git-backed specs
 that AI agents consume**. The list comes from a competitive feature review of **Linear,
 Jira, Aha!, and Productboard** (2025–2026), filtered to what is genuinely *table stakes*
-for SpecBoard rather than each tool's differentiators.
+for Specboard rather than each tool's differentiators.
 
 Each item below is tracked as a GitHub issue under the
 [**PM table stakes** milestone](https://github.com/Specboards/SpecBoard/milestone/1)
 and tagged with a `tier-*` and `area:*` label.
 
-## What SpecBoard already has
+## What Specboard already has
 
 Backlog / Board / Roadmap (by quarter) views · 5-stage status workflow · assignee ·
 priority · manual rank · tags · custom fields · per-feature comments · activity log ·
@@ -166,7 +166,7 @@ not auto-applied on deploy. The DBs are legacy Fly Postgres apps as of 2026-06-2
 
 - **Tier 1: Core PM table stakes.** Most essential to the prioritize/define-specs use case; the
   backlog is hard to run at scale without them. Build first.
-- **Tier 2: Strongly expected.** Baseline across the comparison set; expected by any PM evaluating SpecBoard.
+- **Tier 2: Strongly expected.** Baseline across the comparison set; expected by any PM evaluating Specboard.
 - **Tier 3: Differentiators / later.** Valuable, often signature capabilities of one tool; sequence after Tiers 1–2.
 
 ---
@@ -208,7 +208,7 @@ not auto-applied on deploy. The DBs are legacy Fly Postgres apps as of 2026-06-2
 
 ## Notable items deliberately **not** in scope (each tool's differentiators, not table stakes)
 
-These are what make each tool distinctive but are **not** required to flush out SpecBoard's
+These are what make each tool distinctive but are **not** required to flush out Specboard's
 core use case. Revisit only if they become strategically central.
 
 - **Linear:** AI triage / dedup, Cycle Autopilot, Linear Asks (internal request mgmt), SLAs.
@@ -216,7 +216,7 @@ core use case. Revisit only if they become strategically central.
 - **Aha!:** strategy models/templates, configurable value scorecard depth, presentation/whiteboard suite, proxy voting, capacity planning.
 - **Productboard:** multi-source feedback ingestion breadth, Customer/User Impact Score, Pulse (VoC AI) and Spark (PM agent), segment/cohort analytics.
 
-> SpecBoard's own differentiator remains specs-stay-in-git + metadata-in-DB + MCP for agents.
+> Specboard's own differentiator remains specs-stay-in-git + metadata-in-DB + MCP for agents.
 > The backlog above is about reaching parity on the PM *fundamentals*, not chasing each tool's edge.
 
 ## Source review

@@ -181,7 +181,7 @@ export class GitHubRepoClient implements GitRepoClient {
         head: branch,
         base: this.ref,
         title: input.message,
-        body: `Automated by SpecBoard.\n\n${input.message}`,
+        body: `Automated by Specboard.\n\n${input.message}`,
       });
     }
 

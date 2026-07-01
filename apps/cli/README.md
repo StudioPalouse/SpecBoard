@@ -1,6 +1,6 @@
-# SpecBoard CLI
+# Specboard CLI
 
-`specboard` manages your SpecBoard work items (status, assignment, priority, and
+`specboard` manages your Specboard work items (status, assignment, priority, and
 GitHub links) from the terminal. It talks to the same `/api/v1` surface the web
 app uses, authenticating with a personal API key.
 

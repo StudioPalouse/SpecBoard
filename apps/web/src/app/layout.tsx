@@ -14,7 +14,7 @@ const appOrigin = (process.env.APP_URL ?? process.env.BETTER_AUTH_URL)?.trim();
 
 export const metadata = {
   metadataBase: appOrigin ? new URL(appOrigin) : undefined,
-  title: "SpecBoard",
+  title: "Specboard",
   description: "Spec-based product management over git-native specs.",
 };
 

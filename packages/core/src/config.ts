@@ -5,7 +5,7 @@ import { z } from "zod";
 export const DEFAULT_ESTIMATE_SCALE = [1, 2, 3, 5, 8, 13, 21] as const;
 
 /**
- * Schema for `.specboard/config.yml`, the per-repo file that tells SpecBoard
+ * Schema for `.specboard/config.yml`, the per-repo file that tells Specboard
  * where specs live and how this team's workflow/fields are shaped. Kept in the
  * repo so the configuration is versioned with the code, while the resulting
  * metadata still lives in the DB.

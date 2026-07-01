@@ -7,7 +7,7 @@ import { ApiKeysCard } from "@/components/api-keys-card";
 export const dynamic = "force-dynamic";
 
 /**
- * Personal API keys for the SpecBoard CLI and other programmatic access. Each
+ * Personal API keys for the Specboard CLI and other programmatic access. Each
  * key acts as you, inheriting your workspace role. Unavailable in local file
  * mode (no accounts). The plaintext key is shown once, at creation.
  */

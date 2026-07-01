@@ -2,7 +2,7 @@ import { Suspense } from "react";
 
 import { AuthForm } from "@/components/auth-form";
 
-export const metadata = { title: "Sign in · SpecBoard" };
+export const metadata = { title: "Sign in · Specboard" };
 
 export default function SignInPage() {
   return (

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Drive SpecBoard work-item status from a pull request, via the CLI.
+# Drive Specboard work-item status from a pull request, via the CLI.
 #   PR opened / updated  -> set each touched spec in_progress + link the PR
 #   PR merged            -> set each touched spec done
 #
@@ -10,7 +10,7 @@
 set -uo pipefail
 
 if [ -z "${SPECBOARD_URL:-}" ] || [ -z "${SPECBOARD_TOKEN:-}" ]; then
-  echo "SpecBoard secrets not set; skipping sync."
+  echo "Specboard secrets not set; skipping sync."
   exit 0
 fi
 

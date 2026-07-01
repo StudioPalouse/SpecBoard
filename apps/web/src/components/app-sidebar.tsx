@@ -98,7 +98,7 @@ export function AppSidebar({
             alt=""
             className="h-5 w-5"
           />
-          SpecBoard
+          Specboard
         </Link>
         <OrgSwitcher orgs={orgs} />
         <ProductSwitcher products={products} />

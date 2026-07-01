@@ -15,7 +15,7 @@ import {
 } from "drizzle-orm/pg-core";
 
 /**
- * SpecBoard data model. Spec *content* is canonical in git; this DB holds the
+ * Specboard data model. Spec *content* is canonical in git; this DB holds the
  * *metadata* (status/assignment/priority/ordering) plus a cached index of spec
  * content for fast boards and querying. Every tenant-scoped row carries
  * `workspaceId` so Postgres RLS can isolate tenants (see migrations).

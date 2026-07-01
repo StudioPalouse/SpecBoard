@@ -69,7 +69,7 @@ export async function GET(req: Request) {
       method: "POST",
       headers: {
         accept: "application/vnd.github+json",
-        "user-agent": "SpecBoard",
+        "user-agent": "Specboard",
         "x-github-api-version": "2022-11-28",
       },
     });

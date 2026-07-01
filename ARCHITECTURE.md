@@ -1,8 +1,8 @@
-# SpecBoard Architecture
+# Specboard Architecture
 
-SpecBoard is a lightweight, spec-based product-management layer for teams doing
+Specboard is a lightweight, spec-based product-management layer for teams doing
 **spec-driven development**. Specs live as markdown in your git repo (canonical,
-versioned with code, read by AI coding agents). SpecBoard layers the _product_
+versioned with code, read by AI coding agents). Specboard layers the _product_
 metadata **on top** of those specs (status, assignment, priority, backlog order,
 roadmap) so PM, UX, and engineering can collaborate without editing files in a
 terminal and without duplicating work into a separate tracker.
@@ -16,7 +16,7 @@ Think of it as a spec-native, lightweight ProductBoard / JIRA / Aha!.
 - **JIRA / Aha / ProductBoard** are heavyweight and disconnected from the actual specs,
   forcing duplicate authoring and brittle syncs.
 
-SpecBoard keeps **spec content in git** and **metadata in a database**, joined by a
+Specboard keeps **spec content in git** and **metadata in a database**, joined by a
 stable spec id.
 
 ## System of record
@@ -159,7 +159,7 @@ When `DATABASE_URL` is unset, `apps/web` swaps its store implementation
 (`apps/web/src/lib/store`) for a filesystem-backed one: specs are read directly
 from this repo's `specs/` directory and metadata persists to
 `.specboard/local-metadata.json`. Same UI, zero infrastructure, useful for UI
-testing and for dogfooding SpecBoard on its own specs. Postgres mode is the
+testing and for dogfooding Specboard on its own specs. Postgres mode is the
 deployment shape.
 
 ## Status

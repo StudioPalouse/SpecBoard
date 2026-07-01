@@ -21,7 +21,7 @@ import {
 } from "@specboard/db";
 
 /**
- * SpecBoard MCP server. Gives coding agents a prioritized, status-aware view of
+ * Specboard MCP server. Gives coding agents a prioritized, status-aware view of
  * specs: they see not just the markdown (canonical in git) but the metadata
  * (status, assignee, priority) layered on top from the DB.
  *
@@ -35,7 +35,7 @@ function db(): Database {
     const url = process.env.DATABASE_URL;
     if (!url) {
       throw new Error(
-        "DATABASE_URL is not set. Point it at the SpecBoard Postgres (e.g. postgres://postgres:postgres@localhost:5432/specboard) and seed it with `pnpm --filter @specboard/db seed`.",
+        "DATABASE_URL is not set. Point it at the Specboard Postgres (e.g. postgres://postgres:postgres@localhost:5432/specboard) and seed it with `pnpm --filter @specboard/db seed`.",
       );
     }
     dbInstance = createDb(url);

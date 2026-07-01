@@ -1,4 +1,4 @@
--- RLS policies for SpecBoard multi-tenant isolation.
+-- RLS policies for Specboard multi-tenant isolation.
 --
 -- A row is visible/editable only if the current user is a member of that
 -- row's workspace. The app identifies the user with a transaction-local

@@ -18,14 +18,14 @@ export async function EmptyState({ canConnect = false }: { canConnect?: boolean 
       <CardHeader>
         <CardTitle>No specs yet</CardTitle>
         <CardDescription>
-          SpecBoard fills this board from <code>specs/**/spec.md</code> files in a connected
+          Specboard fills this board from <code>specs/**/spec.md</code> files in a connected
           GitHub repository.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4 text-sm text-muted-foreground">
         <p>
           {canConnect
-            ? "Connect the repository where your specs live. SpecBoard imports every spec and keeps the board in sync on each push."
+            ? "Connect the repository where your specs live. Specboard imports every spec and keeps the board in sync on each push."
             : "Once an admin connects the repository where your specs live, features will appear here automatically."}
         </p>
         {canConnect ? (

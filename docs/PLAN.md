@@ -1,4 +1,4 @@
-# SpecBoard: Architecture & Initial Scaffold
+# Specboard: Architecture & Initial Scaffold
 
 ## Context
 
@@ -16,7 +16,7 @@ needs a lightweight, collaborative product-management layer that:
 
 The reference project `spec-board/spec-board` was rejected because it centralizes specs in
 Postgres, losing git as the source of truth. GitHub **Spec Kit** is git-native but CLI-only
-with no PM layer. JIRA/Aha are heavyweight and disconnected from the actual specs. SpecBoard
+with no PM layer. JIRA/Aha are heavyweight and disconnected from the actual specs. Specboard
 fills the gap.
 
 > **Amendment (2026-06-12):** the Supabase + Vercel decision below is

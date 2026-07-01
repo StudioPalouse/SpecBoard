@@ -24,7 +24,7 @@ const copy: Record<
 > = {
   "sign-in": {
     title: "Sign in",
-    description: "Welcome back to SpecBoard.",
+    description: "Welcome back to Specboard.",
     submit: "Sign in",
     altText: "Need an account?",
     altHref: "/sign-up",
@@ -116,7 +116,7 @@ export function AuthForm({ mode }: { mode: Mode }) {
       <CardHeader>
         <img
           src="/brand/specboard-mark.png"
-          alt="SpecBoard"
+          alt="Specboard"
           className="mb-2 h-8 w-8"
         />
         <CardTitle>{t.title}</CardTitle>

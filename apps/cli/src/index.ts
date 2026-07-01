@@ -13,7 +13,7 @@ const { version: VERSION } = createRequire(import.meta.url)("../package.json") a
   version: string;
 };
 
-const HELP = `SpecBoard CLI
+const HELP = `Specboard CLI
 
 Usage: specboard <command> [options]
 

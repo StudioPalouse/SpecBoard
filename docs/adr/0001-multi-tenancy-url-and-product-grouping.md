@@ -7,7 +7,7 @@
 
 ## Context
 
-SpecBoard began as **one organization per deployment**: the data layer is
+Specboard began as **one organization per deployment**: the data layer is
 fully tenant-scoped (every tenant table carries `workspace_id`, Postgres RLS
 keys on the `app.user_id` session variable, and `members` is
 `unique(workspace_id, user_id)`), but the *resolution* layer hardcodes a single
