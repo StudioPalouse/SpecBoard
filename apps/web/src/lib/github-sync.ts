@@ -23,10 +23,32 @@ import {
   type GitRepoClient,
 } from "@specboard/git";
 
+import { isE2E } from "@/lib/e2e";
 import { getGithubApp } from "@/lib/github-app";
+import { fakeRepoClient } from "@/lib/github-e2e";
 import { ensureDefaultProduct } from "@/lib/workspace";
 
 export type RepoRecord = typeof repositories.$inferSelect;
+
+/**
+ * Resolve the git client for a connected repo. Normally this mints an
+ * installation-scoped GitHub client via the App. Under `SPECBOARD_E2E` it
+ * returns the in-memory fake (see github-e2e.ts) so tests run with no network.
+ * The single choke point for every GitHub read/write in this module.
+ */
+async function resolveRepoClient(db: Database, repo: RepoRecord): Promise<GitRepoClient> {
+  if (isE2E()) return fakeRepoClient(repo);
+  const app = await getGithubApp(db);
+  if (!app) {
+    throw new Error("GitHub App is not configured. Set it up on the Repositories page.");
+  }
+  return createGitHubRepoClient(app, {
+    installationId: repo.githubInstallationId,
+    owner: repo.owner,
+    name: repo.name,
+    ref: repo.defaultBranch,
+  });
+}
 
 /** Path of the per-repo config file, relative to the repo root. */
 const CONFIG_PATH = ".specboard/config.yml";
@@ -149,16 +171,7 @@ function titleFromPath(path: string): string {
  * specs, import them?" prompt before any cards are created.
  */
 export async function scanRepositorySpecs(db: Database, repo: RepoRecord): Promise<SpecScanItem[]> {
-  const app = await getGithubApp(db);
-  if (!app) {
-    throw new Error("GitHub App is not configured. Set it up on the Repositories page.");
-  }
-  const client = await createGitHubRepoClient(app, {
-    installationId: repo.githubInstallationId,
-    owner: repo.owner,
-    name: repo.name,
-    ref: repo.defaultBranch,
-  });
+  const client = await resolveRepoClient(db, repo);
   // Read globs from git config when present, but do not persist anything here.
   const config = await readRepoConfigFromGit(client);
   const globs = config?.specGlobs ?? repoGlobs(repo);
@@ -267,16 +280,7 @@ export async function createStarterSpec(
     throw new Error("Give the feature a name with at least one letter or number.");
   }
 
-  const app = await getGithubApp(db);
-  if (!app) {
-    throw new Error("GitHub App is not configured. Set it up on the Repositories page.");
-  }
-  const client = await createGitHubRepoClient(app, {
-    installationId: repo.githubInstallationId,
-    owner: repo.owner,
-    name: repo.name,
-    ref: repo.defaultBranch,
-  });
+  const client = await resolveRepoClient(db, repo);
 
   const path = `specs/${slug}/spec.md`;
   // Don't clobber an existing spec at that path.
@@ -328,17 +332,7 @@ export async function resolveRepository(
  * data ingestion, not a tenant request, so it does not go through RLS.
  */
 export async function syncRepository(db: Database, repo: RepoRecord): Promise<SyncSummary> {
-  const app = await getGithubApp(db);
-  if (!app) {
-    throw new Error("GitHub App is not configured. Set it up on the Repositories page.");
-  }
-
-  const client = await createGitHubRepoClient(app, {
-    installationId: repo.githubInstallationId,
-    owner: repo.owner,
-    name: repo.name,
-    ref: repo.defaultBranch,
-  });
+  const client = await resolveRepoClient(db, repo);
 
   // Refresh the repo's config from git so glob/field changes take effect, and
   // resolve the globs to scan from it (falling back to the stored/default).

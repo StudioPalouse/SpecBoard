@@ -6,6 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
+    "start:e2e": "next start -p 3100",
+    "test:e2e": "playwright test",
     "typecheck": "tsc --noEmit",
     "lint": "next lint"
   },
@@ -35,6 +37,7 @@
     "tailwindcss": "^4.3.0"
   },
   "devDependencies": {
+    "@playwright/test": "^1.49.1",
     "@tailwindcss/typography": "^0.5.20",
     "@types/node": "^22.10.2",
     "@types/react": "^19.0.2",

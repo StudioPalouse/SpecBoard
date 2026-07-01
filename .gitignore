@@ -20,6 +20,11 @@ out/
 .env.local
 .env*.local
 
+# Playwright E2E (browser artifacts, reports, and the scratch DB/GitHub fixtures)
+test-results/
+playwright-report/
+apps/web/e2e/.tmp/
+
 # OS / editor
 .DS_Store
 .idea/

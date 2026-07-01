@@ -2,6 +2,7 @@ import { desc, githubApp, type Database } from "@specboard/db";
 import { githubAppFrom, githubAppFromEnv } from "@specboard/git";
 
 import { decryptSecret, encryptSecret } from "@/lib/crypto";
+import { isE2E } from "@/lib/e2e";
 
 /**
  * Resolves the deployment's GitHub App, preferring credentials created in-app
@@ -87,6 +88,8 @@ export async function getWebhookSecret(db: Database): Promise<string | null> {
 
 /** The App slug used to build the install URL (stored or env), or null. */
 export async function getGithubAppSlug(db: Database): Promise<string | null> {
+  // A dummy slug in E2E so the install URL renders like production.
+  if (isE2E()) return "specboard-e2e";
   const stored = await getStoredCredentials(db);
   if (stored) return stored.slug;
   return process.env.NEXT_PUBLIC_GITHUB_APP_SLUG?.trim() || null;
@@ -94,5 +97,8 @@ export async function getGithubAppSlug(db: Database): Promise<string | null> {
 
 /** Whether the deployment has GitHub credentials (stored or env). */
 export async function isGithubConfigured(db: Database): Promise<boolean> {
+  // In E2E, GitHub is faked (see github-e2e.ts): report configured so the
+  // onboarding import panel renders without real credentials.
+  if (isE2E()) return true;
   return (await getGithubApp(db)) !== null;
 }

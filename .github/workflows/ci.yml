@@ -1,0 +1,51 @@
+# Continuous integration: typecheck, unit tests, and the Playwright E2E suite on
+# every PR (and on main). This is the green-before-merge gate the project relied
+# on running by hand until now.
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: specboard_e2e
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      # Consumed by the migrate step and the E2E run (both the test runner and
+      # the app server it spawns). Points at the Postgres service above.
+      DATABASE_URL: postgres://postgres:postgres@localhost:5432/specboard_e2e
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+
+      # Build packages + web once; typecheck and E2E both need the output.
+      - run: pnpm -w build
+      - run: pnpm -w typecheck
+      - run: pnpm -w test
+
+      # E2E: apply migrations, install the browser, run the onboarding suite
+      # (SPECBOARD_E2E seams let it run hermetically with a faked GitHub).
+      - run: pnpm --filter @specboard/db migrate
+      - run: pnpm --filter @specboard/web exec playwright install --with-deps chromium
+      - run: pnpm --filter @specboard/web test:e2e

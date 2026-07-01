@@ -5,6 +5,7 @@ import { APIError, createAuthMiddleware } from "better-auth/api";
 import { isBlockedEmailDomain } from "@specboard/core";
 import { createDb, schema } from "@specboard/db";
 
+import { isE2E } from "@/lib/e2e";
 import { renderActionEmail, sendEmail } from "@/lib/email";
 
 /**
@@ -33,7 +34,8 @@ function createAuth(url: string) {
       // Block sign-in until the address is confirmed. Combined with
       // `sendOnSignUp` below this closes the gap where a fresh deployment's
       // first-user admin slot could be claimed without mailbox control.
-      requireEmailVerification: true,
+      // Relaxed only under SPECBOARD_E2E so tests can sign in without a mailbox.
+      requireEmailVerification: !isE2E(),
       sendResetPassword: async ({ user, url }) => {
         const { textBody, htmlBody } = renderActionEmail({
           name: user.name,
@@ -91,7 +93,8 @@ function createAuth(url: string) {
       // Delivered via Postmark when POSTMARK_SERVER_TOKEN is set. Sign-in is
       // gated on verification (see requireEmailVerification above); a failed
       // sign-in by an unverified user re-sends this email automatically.
-      sendOnSignUp: true,
+      // Suppressed under SPECBOARD_E2E (no mailbox in tests).
+      sendOnSignUp: !isE2E(),
       // Land verified users back in the app rather than on a bare API 200.
       autoSignInAfterVerification: true,
       sendVerificationEmail: async ({ user, url }) => {
