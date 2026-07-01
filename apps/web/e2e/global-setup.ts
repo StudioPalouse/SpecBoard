@@ -35,7 +35,13 @@ export default async function globalSetup() {
   await page.waitForURL((url) => !url.pathname.startsWith("/sign-in"));
 
   // First user with no workspace: name the org and start empty -> becomes admin.
-  await page.goto("/setup");
+  // The app redirects a session with no workspace to /setup on its own, and a
+  // hard goto can race that in-flight redirect ("interrupted by another
+  // navigation"), so prefer landing there via the app and only navigate
+  // explicitly if we settled somewhere else.
+  await page
+    .waitForURL("**/setup", { timeout: 15_000 })
+    .catch(() => page.goto("/setup"));
   await page.fill('input[name="name"]', ORG_NAME);
   await page.locator('input[name="start"][value="empty"]').check();
   await page.getByRole("button", { name: "Create organization" }).click();
