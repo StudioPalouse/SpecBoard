@@ -26,7 +26,14 @@ export function middleware(req: NextRequest) {
 
   // `nextUrl.pathname` may arrive encoded (`…/setup%20`) or decoded (`…/setup `)
   // depending on the hop; decode then trim trailing whitespace to catch both.
-  const normalized = decodeURIComponent(pathname).replace(/\s+$/, "");
+  // A malformed percent-escape (`/%C0`) makes decodeURIComponent throw, so guard
+  // it: an undecodable path can't be the setup route, so fall through untouched.
+  let normalized = pathname;
+  try {
+    normalized = decodeURIComponent(pathname).replace(/\s+$/, "");
+  } catch {
+    normalized = pathname;
+  }
   if (normalized === GITHUB_SETUP_PATH && pathname !== GITHUB_SETUP_PATH) {
     const url = req.nextUrl.clone();
     url.pathname = GITHUB_SETUP_PATH;

@@ -2,7 +2,6 @@ import { eq, repositories } from "@specboard/db";
 
 import { getDb } from "@/lib/db";
 import { getGithubAppSlug, isGithubConfigured } from "@/lib/github-app";
-import { installUrlFromSlug } from "@/lib/github-install";
 import { isSingleTenant } from "@/lib/tenancy";
 import { requireWorkspaceAccess } from "@/lib/workspace-access";
 import { RepositoriesManager, type SetupNotice } from "@/components/repositories-manager";
@@ -72,7 +71,7 @@ export default async function RepositoriesSettingsPage({
       canConnect={access.role === "admin"}
       configured={configured}
       selfHosted={isSingleTenant()}
-      installUrl={installUrlFromSlug(slug)}
+      installUrl={slug ? "/api/v1/github/install-start" : null}
       notice={noticeFor(await searchParams)}
     />
   );

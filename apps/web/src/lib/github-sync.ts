@@ -307,18 +307,22 @@ export async function createStarterSpec(
   return { path, summary };
 }
 
-/** Find a connected repository by owner + name (case-sensitive, as GitHub stores them). */
-export async function resolveRepository(
+/**
+ * Every connected repository matching owner + name (case-sensitive, as GitHub
+ * stores them). Returns all rows, not one: the unique key is
+ * (workspaceId, owner, name), so two workspaces can each connect the same repo.
+ * A webhook carries no workspace context, so it must fan out to every tenant
+ * that connected the repo rather than picking one nondeterministically.
+ */
+export async function resolveRepositories(
   db: Database,
   owner: string,
   name: string,
-): Promise<RepoRecord | null> {
-  const rows = await db
+): Promise<RepoRecord[]> {
+  return db
     .select()
     .from(repositories)
-    .where(and(eq(repositories.owner, owner), eq(repositories.name, name)))
-    .limit(1);
-  return rows[0] ?? null;
+    .where(and(eq(repositories.owner, owner), eq(repositories.name, name)));
 }
 
 /**
