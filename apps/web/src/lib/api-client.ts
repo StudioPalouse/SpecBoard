@@ -469,6 +469,36 @@ export async function listInstallationRepositories(): Promise<{
   };
 }
 
+/** A spec repo created and connected in one step from the onboarding nudge. */
+export interface CreatedSpecRepo {
+  id: string;
+  owner: string;
+  name: string;
+  defaultBranch: string;
+  htmlUrl: string;
+}
+
+/**
+ * Create a private repo in the pending installation's GitHub organization and
+ * connect it to the workspace, for the "dedicated spec repo" onboarding path.
+ * Admin-only; requires a pending installation (the signed install cookie).
+ */
+export async function createSpecRepository(input: { name: string }): Promise<CreatedSpecRepo> {
+  const res = await fetch("/api/v1/github/installations/repositories", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(input),
+  });
+  if (res.status === 401) throw new AuthRequiredError();
+  const body = (await res.json().catch(() => null)) as
+    | { repository?: CreatedSpecRepo; error?: string }
+    | null;
+  if (!res.ok || !body?.repository) {
+    throw new Error(body?.error ?? `Couldn't create the repository (${res.status}).`);
+  }
+  return body.repository;
+}
+
 // ── Products ────────────────────────────────────────────────────────────
 
 /** List the products (sibling backlogs) the caller can see. */

@@ -80,6 +80,68 @@ export async function listInstallationRepositories(
   }));
 }
 
+/** The account (organization or user) an App installation is installed on. */
+export interface InstallationAccount {
+  login: string;
+  /** "Organization" or "User" (GitHub may add other kinds, e.g. enterprises). */
+  type: string;
+}
+
+/**
+ * Look up who an installation is installed on. Repo creation is only possible
+ * for organization installations (GitHub has no installation-token endpoint
+ * that creates repos under a personal account), so callers branch on `type`.
+ */
+export async function getInstallationAccount(
+  app: App,
+  installationId: string,
+): Promise<InstallationAccount> {
+  const { data } = await app.octokit.rest.apps.getInstallation({
+    installation_id: Number(installationId),
+  });
+  const account = data.account;
+  if (!account || !("login" in account) || typeof account.login !== "string") {
+    throw new Error("Couldn't resolve the installation's account.");
+  }
+  return {
+    login: account.login,
+    type: "type" in account && typeof account.type === "string" ? account.type : "unknown",
+  };
+}
+
+/** A repository created for an installation, plus its GitHub URL. */
+export interface CreatedRepo extends InstallationRepo {
+  htmlUrl: string;
+}
+
+/**
+ * Create a private repository in the installation's organization, initialized
+ * with a README so the default branch exists for the first spec commit. Needs
+ * the App's repository Administration (write) permission; GitHub automatically
+ * grants the installation access to a repo the App itself creates.
+ */
+export async function createInstallationOrgRepository(
+  app: App,
+  installationId: string,
+  input: { org: string; name: string; description?: string },
+): Promise<CreatedRepo> {
+  const octokit = await app.getInstallationOctokit(Number(installationId));
+  const { data } = await octokit.rest.repos.createInOrg({
+    org: input.org,
+    name: input.name,
+    description: input.description,
+    private: true,
+    auto_init: true,
+  });
+  return {
+    owner: data.owner.login,
+    name: data.name,
+    defaultBranch: data.default_branch ?? "main",
+    private: data.private,
+    htmlUrl: data.html_url,
+  };
+}
+
 /**
  * Resolve an installation-authenticated {@link GitHubRepoClient} for a repo.
  * The `App` mints (and caches) a short-lived installation token under the hood.

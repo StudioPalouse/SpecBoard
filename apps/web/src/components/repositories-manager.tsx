@@ -6,11 +6,13 @@ import { useCallback, useEffect, useState, useTransition } from "react";
 
 import {
   connectRepository,
+  createSpecRepository,
   createStarterSpec,
   disconnectRepository,
   importWorkspaceSpecs,
   listInstallationRepositories,
   scanWorkspaceSpecs,
+  type CreatedSpecRepo,
   type ImportResult,
   type InstallationRepo,
   type RepoScan,
@@ -26,6 +28,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Skeleton } from "@/components/ui/skeleton";
 import { useOrgProductPath } from "@/lib/use-org";
 
 export interface ConnectedRepo {
@@ -37,6 +40,13 @@ export interface ConnectedRepo {
 }
 
 export type SetupNotice = { kind: "ok" | "error"; message: string } | null;
+
+/** The admin's pending App installation, prefetched server-side by the page. */
+export interface PendingInstallationState {
+  installationId: string | null;
+  repositories: InstallationRepo[];
+  error: string | null;
+}
 
 interface RepositoriesManagerProps {
   repos: ConnectedRepo[];
@@ -51,6 +61,8 @@ interface RepositoriesManagerProps {
   installUrl: string | null;
   /** One-time banner from the setup/callback round-trip. */
   notice: SetupNotice;
+  /** Server-prefetched connect-picker state, so it renders without a pop-in. */
+  pendingInstallation: PendingInstallationState;
 }
 
 type Status = { kind: "ok" | "error"; message: string } | null;
@@ -70,6 +82,7 @@ export function RepositoriesManager({
   selfHosted,
   installUrl,
   notice,
+  pendingInstallation,
 }: RepositoriesManagerProps) {
   // Bumped after a repo is connected so the import panel re-scans for new specs.
   const [scanNonce, setScanNonce] = useState(0);
@@ -100,7 +113,13 @@ export function RepositoriesManager({
       <RepoList repos={repos} canResync={canConnect && configured} canManage={canConnect} />
 
       {canConnect && configured && repos.length > 0 ? (
-        <SpecImportPanel scanNonce={scanNonce} repos={repos} installUrl={installUrl} />
+        <SpecImportPanel
+          scanNonce={scanNonce}
+          repos={repos}
+          installUrl={installUrl}
+          installationId={pendingInstallation.installationId}
+          onRepoCreated={bumpScan}
+        />
       ) : null}
 
       {!canConnect ? (
@@ -110,7 +129,12 @@ export function RepositoriesManager({
             : "GitHub isn't set up yet. Ask an admin to connect Specboard to GitHub."}
         </p>
       ) : configured ? (
-        <ConnectSection installUrl={installUrl} connected={repos} onConnected={bumpScan} />
+        <ConnectSection
+          installUrl={installUrl}
+          connected={repos}
+          onConnected={bumpScan}
+          initial={pendingInstallation}
+        />
       ) : selfHosted ? (
         <SetupGitHubCard />
       ) : (
@@ -131,10 +155,16 @@ function SpecImportPanel({
   scanNonce,
   repos,
   installUrl,
+  installationId,
+  onRepoCreated,
 }: {
   scanNonce: number;
   repos: ConnectedRepo[];
   installUrl: string | null;
+  /** Pending installation id, enabling the one-click spec-repo creation. */
+  installationId: string | null;
+  /** Called when the nudge creates a repo, so the panel re-scans. */
+  onRepoCreated: () => void;
 }) {
   const router = useRouter();
   const boardPath = useOrgProductPath();
@@ -191,7 +221,11 @@ function SpecImportPanel({
       </CardHeader>
       <CardContent className="space-y-4">
         {loading && !scan ? (
-          <p className="text-xs text-muted-foreground">Scanning your repositories for specs…</p>
+          <div className="space-y-2" aria-busy="true">
+            <p className="text-xs text-muted-foreground">Scanning your repositories for specs…</p>
+            <Skeleton className="h-9 w-full" />
+            <Skeleton className="h-9 w-3/4" />
+          </div>
         ) : error ? (
           <div className="space-y-2">
             <p className="text-xs text-destructive">{error}</p>
@@ -208,6 +242,8 @@ function SpecImportPanel({
             onRescan={() => void rescan()}
             loading={loading}
             installUrl={installUrl}
+            installationId={installationId}
+            onRepoCreated={onRepoCreated}
           />
         ) : (
           <div className="space-y-3">
@@ -331,12 +367,16 @@ function EmptySpecsState({
   onRescan,
   loading,
   installUrl,
+  installationId,
+  onRepoCreated,
 }: {
   repos: ConnectedRepo[];
   boardHref: string;
   onRescan: () => void;
   loading: boolean;
   installUrl: string | null;
+  installationId: string | null;
+  onRepoCreated: () => void;
 }) {
   const router = useRouter();
   const [featureName, setFeatureName] = useState("");
@@ -438,20 +478,35 @@ function EmptySpecsState({
           </Button>
         </div>
       </form>
-      <CreateSpecRepoNudge installUrl={installUrl} />
+      <CreateSpecRepoNudge
+        installUrl={installUrl}
+        installationId={installationId}
+        onCreated={onRepoCreated}
+      />
     </div>
   );
 }
 
 /**
- * Nudge for users who'd rather keep specs in their own repository. We can't
- * create the repo for them (that needs a GitHub App permission we deliberately
- * don't request), so we deep-link to GitHub's new-repo page prefilled with a
- * sensible name, then walk them back through the existing install -> connect ->
- * first-spec flow. Shown in the two "no suitable repo" moments: the connect
- * section (nothing connected) and the empty-specs first-spec state.
+ * Nudge for users who'd rather keep specs in their own repository. With a
+ * pending organization installation we can create and connect the repo in one
+ * click (the App's repository Administration permission); otherwise, or when
+ * that fails, the manual steps remain: deep-link to GitHub's new-repo page,
+ * install the App on it, connect it here. Shown in the two "no suitable repo"
+ * moments: the connect section (nothing connected) and the empty-specs
+ * first-spec state.
  */
-function CreateSpecRepoNudge({ installUrl }: { installUrl: string | null }) {
+function CreateSpecRepoNudge({
+  installUrl,
+  installationId,
+  onCreated,
+}: {
+  installUrl: string | null;
+  /** Pending installation id; null hides the one-click create form. */
+  installationId: string | null;
+  /** Called after a repo is created + connected, so parent panels refresh. */
+  onCreated: () => void;
+}) {
   const newRepoUrl =
     "https://github.com/new?name=specs&description=" +
     encodeURIComponent("Product specs synced to Specboard");
@@ -462,6 +517,8 @@ function CreateSpecRepoNudge({ installUrl }: { installUrl: string | null }) {
       </summary>
       <div className="mt-3 space-y-3 text-xs text-muted-foreground">
         <p>Keep your specs in their own repository, separate from application code.</p>
+        {installationId ? <CreateSpecRepoForm onCreated={onCreated} /> : null}
+        {installationId ? <p className="font-medium">Or do it yourself:</p> : null}
         <ol className="list-decimal space-y-1 pl-4">
           <li>
             <a href={newRepoUrl} target="_blank" rel="noreferrer" className="underline">
@@ -483,6 +540,73 @@ function CreateSpecRepoNudge({ installUrl }: { installUrl: string | null }) {
         </ol>
       </div>
     </details>
+  );
+}
+
+/**
+ * One-click path of the spec-repo nudge: name the repo and Specboard creates a
+ * private repo in the installation's GitHub organization, connects it, and
+ * hands off to the "create your first spec" walkthrough to seed it. Failures
+ * (personal-account installation, missing Administration permission) surface
+ * inline and the manual steps below stay available.
+ */
+function CreateSpecRepoForm({ onCreated }: { onCreated: () => void }) {
+  const router = useRouter();
+  const [name, setName] = useState("specs");
+  const [pending, startTransition] = useTransition();
+  const [error, setError] = useState<string | null>(null);
+  const [created, setCreated] = useState<CreatedSpecRepo | null>(null);
+
+  function submit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const repoName = name.trim();
+    if (!repoName) {
+      setError("Give the repository a name.");
+      return;
+    }
+    startTransition(async () => {
+      setError(null);
+      try {
+        const result = await createSpecRepository({ name: repoName });
+        setCreated(result);
+        router.refresh();
+        onCreated();
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Couldn't create the repository.");
+      }
+    });
+  }
+
+  if (created) {
+    return (
+      <p>
+        Created and connected{" "}
+        <a href={created.htmlUrl} target="_blank" rel="noreferrer" className="underline">
+          {created.owner}/{created.name}
+        </a>
+        . Now create your first spec in it below.
+      </p>
+    );
+  }
+
+  return (
+    <form onSubmit={submit} className="space-y-2">
+      <p>We can create a private repo in your GitHub organization and connect it for you.</p>
+      <div className="flex items-center gap-2">
+        <Input
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          placeholder="specs"
+          disabled={pending}
+          aria-label="Repository name"
+          className="h-8"
+        />
+        <Button type="submit" size="sm" disabled={pending} className="shrink-0">
+          {pending ? "Creating…" : "Create and connect"}
+        </Button>
+      </div>
+      {error ? <p className="text-destructive">{error}</p> : null}
+    </form>
   );
 }
 
@@ -678,22 +802,27 @@ function RepoRow({
 /**
  * Admin connect controls: the GitHub-App picker (post-install) plus an advanced
  * manual entry fallback. After installing the App, GitHub redirects back and
- * the picker lists the granted repos to connect with one click.
+ * the picker lists the granted repos to connect with one click. The initial
+ * picker state is prefetched server-side (no pop-in); `load()` refreshes it
+ * client-side after a repo is connected or created.
  */
 function ConnectSection({
   installUrl,
   connected,
   onConnected,
+  initial,
 }: {
   installUrl: string | null;
   connected: ConnectedRepo[];
   /** Called after a repo is connected, so the import panel re-scans. */
   onConnected: () => void;
+  /** Server-prefetched picker state, rendered with the initial HTML. */
+  initial: PendingInstallationState;
 }) {
-  const [loading, setLoading] = useState(true);
-  const [loadError, setLoadError] = useState<string | null>(null);
-  const [installationId, setInstallationId] = useState<string | null>(null);
-  const [available, setAvailable] = useState<InstallationRepo[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(initial.error);
+  const [installationId, setInstallationId] = useState<string | null>(initial.installationId);
+  const [available, setAvailable] = useState<InstallationRepo[]>(initial.repositories);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -708,10 +837,6 @@ function ConnectSection({
       setLoading(false);
     }
   }, []);
-
-  useEffect(() => {
-    void load();
-  }, [load]);
 
   const connectedKeys = new Set(connected.map((r) => `${r.owner}/${r.name}`.toLowerCase()));
 
@@ -739,7 +864,10 @@ function ConnectSection({
         )}
 
         {loading ? (
-          <p className="text-xs text-muted-foreground">Loading available repositories…</p>
+          <div className="space-y-2" aria-busy="true">
+            <Skeleton className="h-9 w-full" />
+            <Skeleton className="h-9 w-3/4" />
+          </div>
         ) : loadError ? (
           <p className="text-xs text-destructive">{loadError}</p>
         ) : installationId ? (
@@ -756,7 +884,16 @@ function ConnectSection({
 
         <ManualConnectForm />
 
-        {connected.length === 0 ? <CreateSpecRepoNudge installUrl={installUrl} /> : null}
+        {connected.length === 0 ? (
+          <CreateSpecRepoNudge
+            installUrl={installUrl}
+            installationId={installationId}
+            onCreated={() => {
+              void load();
+              onConnected();
+            }}
+          />
+        ) : null}
       </CardContent>
     </Card>
   );

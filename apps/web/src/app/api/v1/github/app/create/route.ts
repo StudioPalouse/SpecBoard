@@ -78,6 +78,9 @@ export async function GET(req: Request) {
     setup_on_update: true,
     public: false,
     default_permissions: {
+      // administration lets the App create the dedicated spec repo during
+      // onboarding; it is repo-scoped Administration, not org administration.
+      administration: "write",
       contents: "write",
       pull_requests: "write",
       issues: "read",
