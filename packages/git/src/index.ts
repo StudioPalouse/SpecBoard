@@ -70,7 +70,21 @@ export async function reconcileSpecs(
       idInjected = true;
     }
 
-    out.push({ path: file.path, blobSha, spec: parseSpec(raw, file.path), idInjected });
+    // A spec's frontmatter comes from a connected repo (any contributor with
+    // push access), so a single malformed file must not abort the whole sync.
+    // Skip the bad file and reconcile the rest; the parse error is logged.
+    let spec: ParsedSpec;
+    try {
+      spec = parseSpec(raw, file.path);
+    } catch (err) {
+      console.warn(
+        `[specboard] skipping unparseable spec ${file.path}:`,
+        err instanceof Error ? err.message : err,
+      );
+      continue;
+    }
+
+    out.push({ path: file.path, blobSha, spec, idInjected });
   }
 
   return out;

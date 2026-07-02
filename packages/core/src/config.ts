@@ -12,10 +12,19 @@ export const DEFAULT_ESTIMATE_SCALE = [1, 2, 3, 5, 8, 13, 21] as const;
  */
 export const repoConfigSchema = z.object({
   version: z.literal(1),
-  /** Glob(s), relative to repo root, that identify spec directories/files. */
-  specGlobs: z.array(z.string()).default(["specs/**/spec.md"]),
+  /**
+   * Glob(s), relative to repo root, that identify spec directories/files. This
+   * comes from an untrusted `.specboard/config.yml` in a connected repo and is
+   * compiled to a regex and matched against every path in the tree, so bound
+   * both the count and each pattern's length to keep a hostile config from
+   * driving pathological compile/match cost.
+   */
+  specGlobs: z
+    .array(z.string().max(500))
+    .max(100)
+    .default(["specs/**/spec.md"]),
   /** Override the default status vocabulary; first entry is the initial state. */
-  statuses: z.array(z.string()).min(2).optional(),
+  statuses: z.array(z.string().max(200)).min(2).max(100).optional(),
   /** Legal transitions keyed by status; omit to allow any transition. */
   transitions: z.record(z.string(), z.array(z.string())).optional(),
   /** Custom metadata fields surfaced in the UI and stored in DB jsonb. */

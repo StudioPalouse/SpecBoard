@@ -18,9 +18,19 @@ const IV_LEN = 12;
 const TAG_LEN = 16;
 const KEY_LEN = 32;
 
+// This value keys at-rest encryption, the install-cookie HMAC, and Better Auth
+// session signing, so a weak one weakens all three. Refuse anything under 32
+// chars rather than silently deriving a low-entropy key.
+const MIN_SECRET_LEN = 32;
+
 function secret(): string {
   const value = process.env.BETTER_AUTH_SECRET;
   if (!value) throw new Error("BETTER_AUTH_SECRET is not set; cannot encrypt secrets.");
+  if (value.length < MIN_SECRET_LEN) {
+    throw new Error(
+      `BETTER_AUTH_SECRET must be at least ${MIN_SECRET_LEN} characters.`,
+    );
+  }
   return value;
 }
 

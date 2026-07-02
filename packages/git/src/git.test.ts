@@ -196,4 +196,21 @@ describe("reconcileSpecs", () => {
     expect(result[0]).toMatchObject({ idInjected: true, blobSha: "new-blob-sha" });
     expect(result[0]!.spec.frontmatter.id).toMatch(/^[0-9a-f-]{36}$/);
   });
+
+  it("skips an unparseable spec instead of failing the whole sync", async () => {
+    const goodId = "22222222-2222-4222-8222-222222222222";
+    const good = `---\nid: ${goodId}\ntitle: Good\n---\n\nBody`;
+    // Missing the required `title`, so parseSpec throws for this one file.
+    const bad = "---\nid: 33333333-3333-4333-8333-333333333333\n---\n\nBody";
+    const client = new FakeClient([
+      { path: "specs/bad/spec.md", blobSha: "sha-bad", raw: bad },
+      { path: "specs/good/spec.md", blobSha: "sha-good", raw: good },
+    ]);
+
+    const result = await reconcileSpecs(client, ["specs/**/spec.md"]);
+
+    expect(result).toHaveLength(1);
+    expect(result[0]).toMatchObject({ path: "specs/good/spec.md", idInjected: false });
+    expect(result[0]!.spec.frontmatter.id).toBe(goodId);
+  });
 });

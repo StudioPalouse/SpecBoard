@@ -5,6 +5,7 @@ import { getDb } from "@/lib/db";
 import {
   INSTALL_COOKIE,
   INSTALL_COOKIE_MAX_AGE,
+  INSTALL_STATE_COOKIE,
   makeInstallCookieValue,
 } from "@/lib/github-install";
 import { orgPath } from "@/lib/org-path";
@@ -31,6 +32,7 @@ function redirectTo(path: string): Response {
 export async function GET(req: Request) {
   const url = new URL(req.url);
   const installationId = url.searchParams.get("installation_id");
+  const state = url.searchParams.get("state");
 
   const db = getDb();
   const user = await getSessionUser(req);
@@ -44,13 +46,26 @@ export async function GET(req: Request) {
   if (!membership) return redirectTo("/");
   const slug = await workspaceSlug(db, membership.workspaceId);
   const repos = (q = "") => orgPath(slug, `/settings/repositories${q}`);
-  if (membership.role !== "admin" || !installationId) {
+  const jar = await cookies();
+
+  // CSRF: the install must have started via /install-start on this session, so
+  // require the `state` GitHub echoed back to match the one-time cookie. This
+  // stops an attacker from luring an admin to a setup URL that binds a foreign
+  // installation to their session. The cookie is single-use.
+  const expectedState = jar.get(INSTALL_STATE_COOKIE)?.value;
+  jar.delete(INSTALL_STATE_COOKIE);
+  if (
+    membership.role !== "admin" ||
+    !installationId ||
+    !state ||
+    !expectedState ||
+    state !== expectedState
+  ) {
     return redirectTo(repos("?error=install"));
   }
 
   // Remember the installation for this admin so the picker can list its repos
   // without trusting a client-supplied (guessable) id.
-  const jar = await cookies();
   jar.set(INSTALL_COOKIE, makeInstallCookieValue(user.id, installationId), {
     httpOnly: true,
     sameSite: "lax",

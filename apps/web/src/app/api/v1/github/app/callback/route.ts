@@ -65,7 +65,7 @@ export async function GET(req: Request) {
 
   let result: ConversionResult;
   try {
-    const res = await fetch(`https://api.github.com/app-manifests/${code}/conversions`, {
+    const res = await fetch(`https://api.github.com/app-manifests/${encodeURIComponent(code)}/conversions`, {
       method: "POST",
       headers: {
         accept: "application/vnd.github+json",

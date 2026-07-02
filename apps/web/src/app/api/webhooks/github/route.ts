@@ -10,7 +10,7 @@ import { and, eq, featureGithubLinks, type Database } from "@specboard/db";
 
 import { getDb } from "@/lib/db";
 import { getWebhookSecret } from "@/lib/github-app";
-import { repoGlobs, resolveRepository, syncRepository } from "@/lib/github-sync";
+import { repoGlobs, resolveRepositories, syncRepository } from "@/lib/github-sync";
 
 export const dynamic = "force-dynamic";
 
@@ -23,20 +23,24 @@ async function updateLinksFromEntityEvent(
   db: Database,
   evt: GithubEntityEvent,
 ): Promise<number> {
-  const repo = await resolveRepository(db, evt.owner, evt.name);
-  if (!repo) return 0;
-  const updated = await db
-    .update(featureGithubLinks)
-    .set({ state: evt.state, title: evt.title })
-    .where(
-      and(
-        eq(featureGithubLinks.repoId, repo.id),
-        eq(featureGithubLinks.kind, evt.kind),
-        eq(featureGithubLinks.number, evt.number),
-      ),
-    )
-    .returning({ id: featureGithubLinks.id });
-  return updated.length;
+  // Update every workspace that connected this repo, not just one.
+  const repos = await resolveRepositories(db, evt.owner, evt.name);
+  let total = 0;
+  for (const repo of repos) {
+    const updated = await db
+      .update(featureGithubLinks)
+      .set({ state: evt.state, title: evt.title })
+      .where(
+        and(
+          eq(featureGithubLinks.repoId, repo.id),
+          eq(featureGithubLinks.kind, evt.kind),
+          eq(featureGithubLinks.number, evt.number),
+        ),
+      )
+      .returning({ id: featureGithubLinks.id });
+    total += updated.length;
+  }
+  return total;
 }
 
 /**
@@ -98,29 +102,36 @@ export async function POST(req: Request) {
   const push = parsePushEvent(payload);
   if (!push) return Response.json({ ignored: "non-branch or malformed push" }, { status: 202 });
 
-  const repo = await resolveRepository(db, push.owner, push.name);
-  if (!repo) {
+  // Reconcile every workspace that connected this repo (the same repo can be
+  // connected by more than one tenant), each against its own default branch and
+  // spec globs, rather than picking one connection nondeterministically.
+  const repos = await resolveRepositories(db, push.owner, push.name);
+  if (repos.length === 0) {
     return Response.json(
       { error: `Repository ${push.owner}/${push.name} is not connected.` },
       { status: 404 },
     );
   }
 
-  if (push.ref !== repo.defaultBranch) {
-    return Response.json({ ignored: `push to ${push.ref}` }, { status: 202 });
+  let synced = 0;
+  let failed = 0;
+  for (const repo of repos) {
+    if (push.ref !== repo.defaultBranch) continue;
+    // Skip the full reconcile when nothing under this repo's globs changed.
+    if (affectedSpecs(push, repoGlobs(repo)).length === 0) continue;
+    try {
+      await syncRepository(db, repo);
+      synced += 1;
+    } catch (err) {
+      failed += 1;
+      console.error(
+        `[webhooks/github] sync failed for ${push.owner}/${push.name} (workspace ${repo.workspaceId}):`,
+        err,
+      );
+    }
   }
 
-  // Skip the full reconcile when nothing under the spec globs changed.
-  if (affectedSpecs(push, repoGlobs(repo)).length === 0) {
-    return Response.json({ ok: true, changed: 0 });
-  }
-
-  try {
-    const summary = await syncRepository(db, repo);
-    return Response.json({ ok: true, ...summary });
-  } catch (err) {
-    // 500 so GitHub retries the delivery; the cause is logged for ops.
-    console.error(`[webhooks/github] sync failed for ${push.owner}/${push.name}:`, err);
-    return Response.json({ error: "Sync failed." }, { status: 500 });
-  }
+  // 500 (so GitHub retries) only if a connection actually failed to sync.
+  if (failed > 0) return Response.json({ error: "Sync failed." }, { status: 500 });
+  return Response.json({ ok: true, synced });
 }

@@ -154,10 +154,15 @@ export async function getMembership(
   db: Database,
   userId: string,
 ): Promise<Member | null> {
+  // Deterministic pick when a user belongs to more than one workspace (oldest
+  // membership) so API/CLI scope is stable rather than DB-order-dependent. The
+  // proper multi-org fix is to honor an org selector on the API surface too;
+  // until then this at least removes the nondeterminism.
   const rows = await db
     .select()
     .from(members)
     .where(eq(members.userId, userId))
+    .orderBy(members.createdAt)
     .limit(1);
   return rows[0] ?? null;
 }

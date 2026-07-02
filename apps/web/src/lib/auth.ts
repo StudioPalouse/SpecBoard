@@ -124,6 +124,21 @@ function createAuth(url: string) {
         }
       }),
     },
+    // Throttle brute force against the auth surface. Defaults cover every
+    // /api/auth/* route; the custom rules clamp the credential-guessing and
+    // account-enumeration paths harder. Memory-backed (per instance), which is
+    // a reasonable floor; a shared store can come later if we scale out.
+    rateLimit: {
+      enabled: true,
+      window: 60,
+      max: 120,
+      customRules: {
+        "/sign-in/email": { window: 60, max: 5 },
+        "/sign-up/email": { window: 3600, max: 10 },
+        "/forget-password": { window: 3600, max: 5 },
+        "/reset-password": { window: 3600, max: 10 },
+      },
+    },
     advanced: {
       // Postgres mints UUID ids (see schema) instead of Better Auth's
       // default text ids.

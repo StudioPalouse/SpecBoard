@@ -21,9 +21,24 @@ export const INSTALL_COOKIE = "sb_gh_install";
 /** Cookie holding the CSRF nonce for the App-creation (manifest) round-trip. */
 export const APP_SETUP_COOKIE = "sb_gh_app_setup";
 
-/** A random CSRF nonce, round-tripped as the manifest flow's `state`. */
+/** Cookie holding the CSRF nonce for the App install → setup round-trip. */
+export const INSTALL_STATE_COOKIE = "sb_gh_install_state";
+
+/** How long an install-flow CSRF nonce stays valid. */
+export const INSTALL_STATE_MAX_AGE = 60 * 15; // 15 minutes
+
+/** A random CSRF nonce, round-tripped as the manifest/install flow's `state`. */
 export function newSetupNonce(): string {
   return randomBytes(16).toString("hex");
+}
+
+/** Install URL for `slug`, carrying a CSRF `state` GitHub echoes to setup. */
+export function installUrlWithState(
+  slug: string | null,
+  state: string,
+): string | null {
+  const base = installUrlFromSlug(slug);
+  return base ? `${base}?state=${encodeURIComponent(state)}` : null;
 }
 
 /**
@@ -63,6 +78,11 @@ export function githubAppInstallUrl(): string | null {
 function secret(): string {
   const value = process.env.BETTER_AUTH_SECRET;
   if (!value) throw new Error("BETTER_AUTH_SECRET is not set.");
+  // Keep in step with crypto.ts: the same secret keys this HMAC and the at-rest
+  // encryption, so reject a weak one here too.
+  if (value.length < 32) {
+    throw new Error("BETTER_AUTH_SECRET must be at least 32 characters.");
+  }
   return value;
 }
 

@@ -701,6 +701,7 @@ export class DbStore implements FeatureStore {
           "Your role does not permit editing this product.",
         );
       }
+      if (input.assigneeId) await this.assertWorkspaceMember(tx, ws, input.assigneeId);
 
       // DB-native items have no repo/spec; spec_id mirrors the row id so every
       // row stays uniformly routable by specId.
@@ -804,6 +805,9 @@ export class DbStore implements FeatureStore {
         throw new RelationError(
           "Your role does not permit editing this product.",
         );
+      }
+      if (typeof rest.assigneeId === "string" && rest.assigneeId) {
+        await this.assertWorkspaceMember(tx, ws, rest.assigneeId);
       }
       const set: Record<string, unknown> = { ...rest, updatedAt: new Date() };
       if (parentSpecId !== undefined) {
@@ -1240,6 +1244,26 @@ export class DbStore implements FeatureStore {
     return this.scoped(scope, (tx) => this.accessIn(tx, scope!));
   }
 
+  /**
+   * Assert `userId` is a member of `ws`. Guards fields that reference a user by
+   * id (assignee, product-member target) so a caller can't point them at an
+   * arbitrary global user id (e.g. someone in another workspace).
+   */
+  private async assertWorkspaceMember(
+    tx: Tx,
+    ws: string,
+    userId: string,
+  ): Promise<void> {
+    const row = await tx
+      .select({ userId: members.userId })
+      .from(members)
+      .where(and(eq(members.workspaceId, ws), eq(members.userId, userId)))
+      .limit(1);
+    if (!row[0]) {
+      throw new FeatureError("That user is not a member of this workspace.");
+    }
+  }
+
   /** Build the acting user's product access (org-admin flag + per-product roles). */
   private async accessIn(
     tx: Tx,
@@ -1412,7 +1436,26 @@ export class DbStore implements FeatureStore {
         set.name = name;
       }
       if (patch.description !== undefined) set.description = patch.description;
-      if (patch.visibility !== undefined) set.visibility = patch.visibility;
+      if (patch.visibility !== undefined) {
+        // Changing visibility can expose a private product to the whole org (or
+        // hide an org one), so restrict it to org admins even though a product
+        // admin may otherwise manage the product's settings.
+        const current = await tx
+          .select({ visibility: products.visibility })
+          .from(products)
+          .where(and(eq(products.id, id), eq(products.workspaceId, ws)))
+          .limit(1);
+        if (
+          current[0] &&
+          current[0].visibility !== patch.visibility &&
+          !(await this.accessIn(tx, scope!)).isOrgAdmin
+        ) {
+          throw new ProductError(
+            "Only an organization admin can change a product's visibility.",
+          );
+        }
+        set.visibility = patch.visibility;
+      }
       if (patch.position !== undefined) set.position = patch.position;
       if (patch.color !== undefined) set.color = patch.color;
       const [row] = await tx
@@ -1490,6 +1533,7 @@ export class DbStore implements FeatureStore {
     await this.scoped(scope, async (tx) => {
       const ws = scope!.workspaceId;
       await this.requireProductId(tx, ws, productId);
+      await this.assertWorkspaceMember(tx, ws, input.userId);
       await tx
         .insert(productMembers)
         .values({
